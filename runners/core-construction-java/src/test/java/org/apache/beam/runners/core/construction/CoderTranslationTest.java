@@ -30,6 +30,8 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.beam.model.pipeline.v1.RunnerApi;
+import org.apache.beam.model.pipeline.v1.RunnerApi.Components;
 import org.apache.beam.sdk.coders.AtomicCoder;
 import org.apache.beam.sdk.coders.AvroCoder;
 import org.apache.beam.sdk.coders.ByteArrayCoder;
@@ -42,8 +44,6 @@ import org.apache.beam.sdk.coders.SerializableCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.coders.StructuredCoder;
 import org.apache.beam.sdk.coders.VarLongCoder;
-import org.apache.beam.sdk.common.runner.v1.RunnerApi;
-import org.apache.beam.sdk.common.runner.v1.RunnerApi.Components;
 import org.apache.beam.sdk.transforms.windowing.GlobalWindow;
 import org.apache.beam.sdk.transforms.windowing.IntervalWindow.IntervalWindowCoder;
 import org.apache.beam.sdk.util.WindowedValue.FullWindowedValueCoder;
@@ -136,7 +136,9 @@ public class CoderTranslationTest {
       RunnerApi.Coder coderProto = CoderTranslation.toProto(coder, componentsBuilder);
 
       Components encodedComponents = componentsBuilder.toComponents();
-      Coder<?> decodedCoder = CoderTranslation.fromProto(coderProto, encodedComponents);
+      Coder<?> decodedCoder =
+          CoderTranslation.fromProto(
+              coderProto, RehydratedComponents.forComponents(encodedComponents));
       assertThat(decodedCoder, Matchers.<Coder<?>>equalTo(coder));
 
       if (KNOWN_CODERS.contains(coder)) {

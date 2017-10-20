@@ -71,7 +71,6 @@ import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions;
 import org.apache.beam.runners.dataflow.options.DataflowPipelineWorkerPoolOptions;
 import org.apache.beam.runners.dataflow.util.CloudObject;
 import org.apache.beam.runners.dataflow.util.CloudObjects;
-import org.apache.beam.runners.dataflow.util.DoFnInfo;
 import org.apache.beam.runners.dataflow.util.OutputReference;
 import org.apache.beam.runners.dataflow.util.PropertyNames;
 import org.apache.beam.runners.dataflow.util.Structs;
@@ -84,6 +83,7 @@ import org.apache.beam.sdk.extensions.gcp.auth.TestCredential;
 import org.apache.beam.sdk.extensions.gcp.storage.GcsPathValidator;
 import org.apache.beam.sdk.io.FileSystems;
 import org.apache.beam.sdk.io.TextIO;
+import org.apache.beam.sdk.io.range.OffsetRange;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider;
@@ -98,11 +98,11 @@ import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.Sum;
 import org.apache.beam.sdk.transforms.View;
 import org.apache.beam.sdk.transforms.display.DisplayData;
-import org.apache.beam.sdk.transforms.splittabledofn.OffsetRange;
 import org.apache.beam.sdk.transforms.splittabledofn.OffsetRangeTracker;
 import org.apache.beam.sdk.transforms.windowing.FixedWindows;
 import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.transforms.windowing.WindowFn;
+import org.apache.beam.sdk.util.DoFnInfo;
 import org.apache.beam.sdk.util.GcsUtil;
 import org.apache.beam.sdk.util.SerializableUtils;
 import org.apache.beam.sdk.util.gcsfs.GcsPath;
@@ -200,6 +200,7 @@ public class DataflowPipelineTranslatorTest implements Serializable {
     options.setGcpCredential(new TestCredential());
     options.setJobName("some-job-name");
     options.setProject("some-project");
+    options.setRegion("some-region");
     options.setTempLocation(GcsPath.fromComponents("somebucket", "some/path").toString());
     options.setFilesToStage(new LinkedList<String>());
     options.setDataflowClient(buildMockDataflow(new IsValidCreateRequest()));
@@ -605,11 +606,6 @@ public class DataflowPipelineTranslatorTest implements Serializable {
       // Return a value unrelated to the input.
       return input.getPipeline().apply(Create.of(1, 2, 3, 4));
     }
-
-    @Override
-    protected Coder<?> getDefaultOutputCoder() {
-      return VarIntCoder.of();
-    }
   }
 
   /**
@@ -624,11 +620,6 @@ public class DataflowPipelineTranslatorTest implements Serializable {
       input.apply(Count.<Integer>perElement());
 
       return PDone.in(input.getPipeline());
-    }
-
-    @Override
-    protected Coder<?> getDefaultOutputCoder() {
-      return VoidCoder.of();
     }
   }
 
@@ -649,10 +640,13 @@ public class DataflowPipelineTranslatorTest implements Serializable {
 
       // Fails here when attempting to construct a tuple with an unbound object.
       return PCollectionTuple.of(sumTag, sum)
-          .and(doneTag, PCollection.<Void>createPrimitiveOutputInternal(
-              input.getPipeline(),
-              WindowingStrategy.globalDefault(),
-              input.isBounded()));
+          .and(
+              doneTag,
+              PCollection.createPrimitiveOutputInternal(
+                  input.getPipeline(),
+                  WindowingStrategy.globalDefault(),
+                  input.isBounded(),
+                  VoidCoder.of()));
     }
   }
 
@@ -754,7 +748,7 @@ public class DataflowPipelineTranslatorTest implements Serializable {
 
   /**
    * Test that in translation the name for a collection (in this case just a Create output) is
-   * overriden to be what the Dataflow service expects.
+   * overridden to be what the Dataflow service expects.
    */
   @Test
   public void testNamesOverridden() throws Exception {

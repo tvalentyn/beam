@@ -22,7 +22,7 @@ import static org.junit.Assert.assertThat;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
-import org.apache.beam.sdk.common.runner.v1.RunnerApi;
+import org.apache.beam.model.pipeline.v1.RunnerApi;
 import org.apache.beam.sdk.transforms.windowing.AfterWatermark;
 import org.apache.beam.sdk.transforms.windowing.FixedWindows;
 import org.apache.beam.sdk.transforms.windowing.Sessions;
@@ -108,13 +108,17 @@ public class WindowingStrategyTranslationTest {
     SdkComponents components = SdkComponents.create();
     RunnerApi.WindowingStrategy proto =
         WindowingStrategyTranslation.toProto(windowingStrategy, components);
-    RunnerApi.Components protoComponents = components.toComponents();
+    RehydratedComponents protoComponents =
+        RehydratedComponents.forComponents(components.toComponents());
 
     assertThat(
         WindowingStrategyTranslation.fromProto(proto, protoComponents).fixDefaults(),
         Matchers.<WindowingStrategy<?, ?>>equalTo(windowingStrategy.fixDefaults()));
 
-    protoComponents.getCodersOrThrow(
+    protoComponents.getCoder(
         components.registerCoder(windowingStrategy.getWindowFn().windowCoder()));
+    assertThat(
+        proto.getAssignsToOneWindow(),
+        equalTo(windowingStrategy.getWindowFn().assignsToOneWindow()));
   }
 }

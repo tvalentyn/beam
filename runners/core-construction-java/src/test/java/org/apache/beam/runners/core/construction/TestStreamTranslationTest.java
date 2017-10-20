@@ -23,12 +23,13 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.beam.model.pipeline.v1.RunnerApi;
+import org.apache.beam.model.pipeline.v1.RunnerApi.ParDoPayload;
+import org.apache.beam.model.pipeline.v1.RunnerApi.TestStreamPayload;
 import org.apache.beam.runners.core.construction.TestStreamTranslationTest.TestStreamPayloadTranslation;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.coders.VarIntCoder;
-import org.apache.beam.sdk.common.runner.v1.RunnerApi;
-import org.apache.beam.sdk.common.runner.v1.RunnerApi.ParDoPayload;
 import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.testing.TestPipeline;
 import org.apache.beam.sdk.testing.TestStream;
@@ -80,9 +81,10 @@ public class TestStreamTranslationTest {
     public void testEncodedProto() throws Exception {
       SdkComponents components = SdkComponents.create();
       RunnerApi.TestStreamPayload payload =
-          TestStreamTranslation.testStreamToPayload(testStream, components);
+          TestStreamTranslation.payloadForTestStream(testStream, components);
 
-      verifyTestStreamEncoding(testStream, payload, components.toComponents());
+      verifyTestStreamEncoding(
+          testStream, payload, RehydratedComponents.forComponents(components.toComponents()));
     }
 
     @Test
@@ -99,29 +101,28 @@ public class TestStreamTranslationTest {
 
       assertThat(spec.getUrn(), equalTo(TEST_STREAM_TRANSFORM_URN));
 
-      RunnerApi.TestStreamPayload payload =
-          spec.getParameter().unpack(RunnerApi.TestStreamPayload.class);
+      RunnerApi.TestStreamPayload payload = TestStreamPayload.parseFrom(spec.getPayload());
 
-      verifyTestStreamEncoding(testStream, payload, components.toComponents());
+      verifyTestStreamEncoding(
+          testStream, payload, RehydratedComponents.forComponents(components.toComponents()));
     }
 
     private static <T> void verifyTestStreamEncoding(
         TestStream<T> testStream,
         RunnerApi.TestStreamPayload payload,
-        RunnerApi.Components protoComponents)
+        RehydratedComponents protoComponents)
         throws Exception {
 
       // This reverse direction is only valid for Java-based coders
       assertThat(
-          CoderTranslation.fromProto(
-              protoComponents.getCodersOrThrow(payload.getCoderId()), protoComponents),
+          protoComponents.getCoder(payload.getCoderId()),
           Matchers.<Coder<?>>equalTo(testStream.getValueCoder()));
 
       assertThat(payload.getEventsList().size(), equalTo(testStream.getEvents().size()));
 
       for (int i = 0; i < payload.getEventsList().size(); ++i) {
         assertThat(
-            TestStreamTranslation.fromProto(payload.getEvents(i), testStream.getValueCoder()),
+            TestStreamTranslation.eventFromProto(payload.getEvents(i), testStream.getValueCoder()),
             equalTo(testStream.getEvents().get(i)));
       }
     }

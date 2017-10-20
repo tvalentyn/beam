@@ -27,7 +27,7 @@ import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import java.net.SocketAddress;
 import java.util.List;
-import org.apache.beam.fn.v1.BeamFnApi.ApiServiceDescriptor;
+import org.apache.beam.model.pipeline.v1.Endpoints.ApiServiceDescriptor;
 import org.apache.beam.runners.dataflow.options.DataflowPipelineDebugOptions;
 import org.apache.beam.sdk.options.PipelineOptions;
 
@@ -61,6 +61,9 @@ public abstract class ManagedChannelFactory {
               ? EpollDomainSocketChannel.class : EpollSocketChannel.class)
           .eventLoopGroup(new EpollEventLoopGroup())
           .usePlaintext(true)
+          // Set the message size to max value here. The actual size is governed by the
+          // buffer size in the layers above.
+          .maxInboundMessageSize(Integer.MAX_VALUE)
           .build();
     }
   }
@@ -74,6 +77,9 @@ public abstract class ManagedChannelFactory {
     public ManagedChannel forDescriptor(ApiServiceDescriptor apiServiceDescriptor) {
       return ManagedChannelBuilder.forTarget(apiServiceDescriptor.getUrl())
           .usePlaintext(true)
+          // Set the message size to max value here. The actual size is governed by the
+          // buffer size in the layers above.
+          .maxInboundMessageSize(Integer.MAX_VALUE)
           .build();
     }
   }

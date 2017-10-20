@@ -26,9 +26,10 @@ from __future__ import absolute_import
 import argparse
 import logging
 
-
 import apache_beam as beam
 import apache_beam.transforms.window as window
+from apache_beam.options.pipeline_options import PipelineOptions
+from apache_beam.options.pipeline_options import StandardOptions
 
 
 def split_fn(lines):
@@ -41,18 +42,26 @@ def run(argv=None):
   parser = argparse.ArgumentParser()
   parser.add_argument(
       '--input_topic', required=True,
-      help='Input PubSub topic of the form "/topics/<PROJECT>/<TOPIC>".')
+      help=('Input PubSub topic of the form '
+            '"projects/<PROJECT>/topics/<TOPIC>".'))
   parser.add_argument(
       '--output_topic', required=True,
-      help='Output PubSub topic of the form "/topics/<PROJECT>/<TOPIC>".')
+      help=('Output PubSub topic of the form '
+            '"projects/<PROJECT>/topic/<TOPIC>".'))
   known_args, pipeline_args = parser.parse_known_args(argv)
+  options = PipelineOptions(pipeline_args)
+  options.view_as(StandardOptions).streaming = True
 
-  with beam.Pipeline(argv=pipeline_args) as p:
+  with beam.Pipeline(options=options) as p:
 
     # Read from PubSub into a PCollection.
     lines = p | beam.io.ReadStringsFromPubSub(known_args.input_topic)
 
     # Capitalize the characters in each line.
+    def count_ones(word_ones):
+      (word, ones) = word_ones
+      return (word, sum(ones))
+
     transformed = (lines
                    # Use a pre-defined function that imports the re package.
                    | 'Split' >> (
@@ -60,7 +69,7 @@ def run(argv=None):
                    | 'PairWithOne' >> beam.Map(lambda x: (x, 1))
                    | beam.WindowInto(window.FixedWindows(15, 0))
                    | 'Group' >> beam.GroupByKey()
-                   | 'Count' >> beam.Map(lambda (word, ones): (word, sum(ones)))
+                   | 'Count' >> beam.Map(count_ones)
                    | 'Format' >> beam.Map(lambda tup: '%s: %d' % tup))
 
     # Write to PubSub.

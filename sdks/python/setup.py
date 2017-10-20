@@ -104,6 +104,10 @@ REQUIRED_PACKAGES = [
     'oauth2client>=2.0.1,<4.0.0',
     'protobuf>=3.2.0,<=3.3.0',
     'pyyaml>=3.12,<4.0.0',
+    # Six 1.11.0 incompatible with apitools.
+    # TODO(BEAM-2964): Remove the upper bound.
+    'six>=1.9,<1.11',
+    'typing>=3.6.0,<3.7.0',
     ]
 
 REQUIRED_SETUP_PACKAGES = [
@@ -113,16 +117,18 @@ REQUIRED_SETUP_PACKAGES = [
 REQUIRED_TEST_PACKAGES = [
     'pyhamcrest>=1.9,<2.0',
     # Six required by nose plugins management.
-    'six>=1.9',
+    # Six 1.11.0 incompatible with apitools.
+    # TODO(BEAM-2964): Remove the upper bound.
+    'six>=1.9,<1.11',
     ]
 
 GCP_REQUIREMENTS = [
   'google-apitools>=0.5.10,<=0.5.11',
   'proto-google-cloud-datastore-v1>=0.90.0,<=0.90.4',
   'googledatastore==7.0.1',
-  'google-cloud-pubsub==0.25.0',
+  'google-cloud-pubsub==0.26.0',
   # GCP packages required by tests
-  'google-cloud-bigquery>=0.23.0,<0.25.0',
+  'google-cloud-bigquery==0.25.0',
 ]
 
 

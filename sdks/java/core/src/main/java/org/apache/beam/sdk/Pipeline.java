@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.beam.sdk.annotations.Internal;
 import org.apache.beam.sdk.coders.CoderRegistry;
 import org.apache.beam.sdk.io.Read;
@@ -178,6 +179,12 @@ public class Pipeline {
   public <OutputT extends POutput> OutputT apply(
       String name, PTransform<? super PBegin, OutputT> root) {
     return begin().apply(name, root);
+  }
+
+  @Internal
+  public static Pipeline forTransformHierarchy(
+      TransformHierarchy transforms, PipelineOptions options) {
+    return new Pipeline(transforms, options);
   }
 
   /**
@@ -387,9 +394,13 @@ public class Pipeline {
      */
     class Defaults implements PipelineVisitor {
 
-      private Pipeline pipeline;
+      @Nullable private Pipeline pipeline;
 
       protected Pipeline getPipeline() {
+        if (pipeline == null) {
+          throw new IllegalStateException(
+              "Illegal access to pipeline after visitor traversal was completed");
+        }
         return pipeline;
       }
 
@@ -476,14 +487,22 @@ public class Pipeline {
   /////////////////////////////////////////////////////////////////////////////
   // Below here are internal operations, never called by users.
 
-  private final TransformHierarchy transforms = new TransformHierarchy();
+  private final TransformHierarchy transforms;
   private Set<String> usedFullNames = new HashSet<>();
-  private CoderRegistry coderRegistry;
+
+  /** Lazily initialized; access via {@link #getCoderRegistry()}. */
+  @Nullable private CoderRegistry coderRegistry;
+
   private final List<String> unstableNames = new ArrayList<>();
   private final PipelineOptions defaultOptions;
 
-  protected Pipeline(PipelineOptions options) {
+  private Pipeline(TransformHierarchy transforms, PipelineOptions options) {
+    this.transforms = transforms;
     this.defaultOptions = options;
+  }
+
+  protected Pipeline(PipelineOptions options) {
+    this(new TransformHierarchy(), options);
   }
 
   @Override

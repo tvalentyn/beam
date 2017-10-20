@@ -22,6 +22,7 @@ import static org.hamcrest.Matchers.both;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
@@ -45,6 +46,8 @@ import com.google.api.services.dataflow.Dataflow;
 import com.google.api.services.dataflow.model.DataflowPackage;
 import com.google.api.services.dataflow.model.Job;
 import com.google.api.services.dataflow.model.ListJobsResponse;
+import com.google.api.services.dataflow.model.WorkerPool;
+import com.google.api.services.storage.model.StorageObject;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
@@ -64,6 +67,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.beam.runners.dataflow.DataflowRunner.StreamingShardedWriteFactory;
 import org.apache.beam.runners.dataflow.options.DataflowPipelineDebugOptions;
 import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions;
@@ -71,15 +75,17 @@ import org.apache.beam.runners.dataflow.options.DataflowPipelineWorkerPoolOption
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.Pipeline.PipelineVisitor;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
-import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.coders.VoidCoder;
 import org.apache.beam.sdk.extensions.gcp.auth.NoopCredentialFactory;
 import org.apache.beam.sdk.extensions.gcp.auth.TestCredential;
 import org.apache.beam.sdk.extensions.gcp.storage.NoopPathValidator;
+import org.apache.beam.sdk.io.DynamicFileDestinations;
 import org.apache.beam.sdk.io.FileBasedSink;
 import org.apache.beam.sdk.io.FileSystems;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.WriteFiles;
+import org.apache.beam.sdk.io.WriteFilesResult;
+import org.apache.beam.sdk.io.fs.ResourceId;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptions.CheckEnabled;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
@@ -100,14 +106,15 @@ import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
+import org.apache.beam.sdk.transforms.SerializableFunctions;
+import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
+import org.apache.beam.sdk.transforms.windowing.PaneInfo;
 import org.apache.beam.sdk.transforms.windowing.Sessions;
 import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.util.GcsUtil;
-import org.apache.beam.sdk.util.ReleaseInfo;
 import org.apache.beam.sdk.util.gcsfs.GcsPath;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.PDone;
 import org.apache.beam.sdk.values.PValue;
 import org.apache.beam.sdk.values.TimestampedValue;
 import org.apache.beam.sdk.values.TupleTag;
@@ -137,6 +144,7 @@ import org.mockito.stubbing.Answer;
 @RunWith(JUnit4.class)
 public class DataflowRunnerTest implements Serializable {
 
+  private static final String VALID_BUCKET = "valid-bucket";
   private static final String VALID_STAGING_BUCKET = "gs://valid-bucket/staging";
   private static final String VALID_TEMP_BUCKET = "gs://valid-bucket/temp";
   private static final String VALID_PROFILE_BUCKET = "gs://valid-bucket/profiles";
@@ -157,20 +165,43 @@ public class DataflowRunnerTest implements Serializable {
     assertNull(job.getId());
     assertNull(job.getCurrentState());
     assertTrue(Pattern.matches("[a-z]([-a-z0-9]*[a-z0-9])?", job.getName()));
+
+    for (WorkerPool workerPool : job.getEnvironment().getWorkerPools()) {
+      assertThat(workerPool.getMetadata(),
+          hasKey(DataflowRunner.STAGED_PIPELINE_METADATA_PROPERTY));
+    }
   }
 
   @Before
   public void setUp() throws IOException {
     this.mockGcsUtil = mock(GcsUtil.class);
+
     when(mockGcsUtil.create(any(GcsPath.class), anyString()))
-        .then(new Answer<SeekableByteChannel>() {
-          @Override
-          public SeekableByteChannel answer(InvocationOnMock invocation) throws Throwable {
-            return FileChannel.open(
-                Files.createTempFile("channel-", ".tmp"),
-                StandardOpenOption.CREATE, StandardOpenOption.DELETE_ON_CLOSE);
-          }
-        });
+        .then(
+            new Answer<SeekableByteChannel>() {
+              @Override
+              public SeekableByteChannel answer(InvocationOnMock invocation) throws Throwable {
+                return FileChannel.open(
+                    Files.createTempFile("channel-", ".tmp"),
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.DELETE_ON_CLOSE);
+              }
+            });
+
+    when(mockGcsUtil.create(any(GcsPath.class), anyString(), anyInt()))
+        .then(
+            new Answer<SeekableByteChannel>() {
+              @Override
+              public SeekableByteChannel answer(InvocationOnMock invocation) throws Throwable {
+                return FileChannel.open(
+                    Files.createTempFile("channel-", ".tmp"),
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.DELETE_ON_CLOSE);
+              }
+            });
+
     when(mockGcsUtil.expand(any(GcsPath.class))).then(new Answer<List<GcsPath>>() {
       @Override
       public List<GcsPath> answer(InvocationOnMock invocation) throws Throwable {
@@ -178,12 +209,35 @@ public class DataflowRunnerTest implements Serializable {
       }
     });
     when(mockGcsUtil.bucketAccessible(GcsPath.fromUri(VALID_STAGING_BUCKET))).thenReturn(true);
-    when(mockGcsUtil.bucketAccessible(GcsPath.fromUri(VALID_STAGING_BUCKET))).thenReturn(true);
     when(mockGcsUtil.bucketAccessible(GcsPath.fromUri(VALID_TEMP_BUCKET))).thenReturn(true);
     when(mockGcsUtil.bucketAccessible(GcsPath.fromUri(VALID_TEMP_BUCKET + "/staging/"))).
         thenReturn(true);
     when(mockGcsUtil.bucketAccessible(GcsPath.fromUri(VALID_PROFILE_BUCKET))).thenReturn(true);
     when(mockGcsUtil.bucketAccessible(GcsPath.fromUri(NON_EXISTENT_BUCKET))).thenReturn(false);
+
+    // Let every valid path be matched
+    when(mockGcsUtil.getObjects(anyListOf(GcsPath.class)))
+        .thenAnswer(
+            new Answer<List<GcsUtil.StorageObjectOrIOException>>() {
+              @Override
+              public List<GcsUtil.StorageObjectOrIOException> answer(
+                  InvocationOnMock invocationOnMock) throws Throwable {
+
+                List<GcsPath> gcsPaths = (List<GcsPath>) invocationOnMock.getArguments()[0];
+                List<GcsUtil.StorageObjectOrIOException> results = new ArrayList<>();
+
+                for (GcsPath gcsPath : gcsPaths) {
+                  if (gcsPath.getBucket().equals(VALID_BUCKET)) {
+                    StorageObject resultObject = new StorageObject();
+                    resultObject.setBucket(gcsPath.getBucket());
+                    resultObject.setName(gcsPath.getObject());
+                    results.add(GcsUtil.StorageObjectOrIOException.create(resultObject));
+                  }
+                }
+
+                return results;
+              }
+            });
 
     // The dataflow pipeline attempts to output to this location.
     when(mockGcsUtil.bucketAccessible(GcsPath.fromUri("gs://bucket/object"))).thenReturn(true);
@@ -334,6 +388,18 @@ public class DataflowRunnerTest implements Serializable {
 
     DataflowRunner.fromOptions(options);
     assertThat(options.getJobName(), equalTo(mixedCase.toLowerCase()));
+  }
+
+  @Test
+  public void testFromOptionsUserAgentFromPipelineInfo() throws Exception {
+    DataflowPipelineOptions options = buildPipelineOptions();
+    DataflowRunner.fromOptions(options);
+
+    String expectedName = DataflowRunnerInfo.getDataflowRunnerInfo().getName().replace(" ", "_");
+    assertThat(options.getUserAgent(), containsString(expectedName));
+
+    String expectedVersion = DataflowRunnerInfo.getDataflowRunnerInfo().getVersion();
+    assertThat(options.getUserAgent(), containsString(expectedVersion));
   }
 
   @Test
@@ -508,14 +574,17 @@ public class DataflowRunnerTest implements Serializable {
     options.setGcpCredential(new TestCredential());
 
     when(mockGcsUtil.create(any(GcsPath.class), anyString(), anyInt()))
-        .then(new Answer<SeekableByteChannel>() {
-          @Override
-          public SeekableByteChannel answer(InvocationOnMock invocation) throws Throwable {
-            return FileChannel.open(
-                Files.createTempFile("channel-", ".tmp"),
-                StandardOpenOption.CREATE, StandardOpenOption.DELETE_ON_CLOSE);
-          }
-        });
+        .then(
+            new Answer<SeekableByteChannel>() {
+              @Override
+              public SeekableByteChannel answer(InvocationOnMock invocation) throws Throwable {
+                return FileChannel.open(
+                    Files.createTempFile("channel-", ".tmp"),
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.DELETE_ON_CLOSE);
+              }
+            });
 
     Pipeline p = buildDataflowPipeline(options);
 
@@ -544,10 +613,10 @@ public class DataflowRunnerTest implements Serializable {
         cloudDataflowDataset,
         workflowJob.getEnvironment().getDataset());
     assertEquals(
-        ReleaseInfo.getReleaseInfo().getName(),
+        DataflowRunnerInfo.getDataflowRunnerInfo().getName(),
         workflowJob.getEnvironment().getUserAgent().get("name"));
     assertEquals(
-        ReleaseInfo.getReleaseInfo().getVersion(),
+        DataflowRunnerInfo.getDataflowRunnerInfo().getVersion(),
         workflowJob.getEnvironment().getUserAgent().get("version"));
   }
 
@@ -947,15 +1016,11 @@ public class DataflowRunnerTest implements Serializable {
 
     @Override
     public PCollection<Integer> expand(PCollection<Integer> input) {
-      return PCollection.<Integer>createPrimitiveOutputInternal(
+      return PCollection.createPrimitiveOutputInternal(
           input.getPipeline(),
           WindowingStrategy.globalDefault(),
-          input.isBounded());
-    }
-
-    @Override
-    protected Coder<?> getDefaultOutputCoder(PCollection<Integer> input) {
-      return input.getCoder();
+          input.isBounded(),
+          input.getCoder());
     }
   }
 
@@ -1263,30 +1328,57 @@ public class DataflowRunnerTest implements Serializable {
   private void testStreamingWriteOverride(PipelineOptions options, int expectedNumShards) {
     TestPipeline p = TestPipeline.fromOptions(options);
 
-    StreamingShardedWriteFactory<Object> factory =
+    StreamingShardedWriteFactory<Object, Void, Object> factory =
         new StreamingShardedWriteFactory<>(p.getOptions());
-    WriteFiles<Object> original = WriteFiles.to(new TestSink(tmpFolder.toString()));
+    WriteFiles<Object, Void, Object> original = WriteFiles.to(new TestSink(tmpFolder.toString()));
     PCollection<Object> objs = (PCollection) p.apply(Create.empty(VoidCoder.of()));
-    AppliedPTransform<PCollection<Object>, PDone, WriteFiles<Object>> originalApplication =
-        AppliedPTransform.of(
-            "writefiles", objs.expand(), Collections.<TupleTag<?>, PValue>emptyMap(), original, p);
+    AppliedPTransform<PCollection<Object>, WriteFilesResult<Void>, WriteFiles<Object, Void, Object>>
+        originalApplication =
+            AppliedPTransform.of(
+                "writefiles",
+                objs.expand(),
+                Collections.<TupleTag<?>, PValue>emptyMap(),
+                original,
+                p);
 
-    WriteFiles<Object> replacement = (WriteFiles<Object>)
-        factory.getReplacementTransform(originalApplication).getTransform();
+    WriteFiles<Object, Void, Object> replacement =
+        (WriteFiles<Object, Void, Object>)
+            factory.getReplacementTransform(originalApplication).getTransform();
     assertThat(replacement, not(equalTo((Object) original)));
     assertThat(replacement.getNumShards().get(), equalTo(expectedNumShards));
   }
 
-  private static class TestSink extends FileBasedSink<Object> {
+  private static class TestSink extends FileBasedSink<Object, Void, Object> {
     @Override
     public void validate(PipelineOptions options) {}
 
     TestSink(String tmpFolder) {
-      super(StaticValueProvider.of(FileSystems.matchNewResource(tmpFolder, true)),
-          null);
+      super(
+          StaticValueProvider.of(FileSystems.matchNewResource(tmpFolder, true)),
+          DynamicFileDestinations.constant(
+              new FilenamePolicy() {
+                @Override
+                public ResourceId windowedFilename(
+                    int shardNumber,
+                    int numShards,
+                    BoundedWindow window,
+                    PaneInfo paneInfo,
+                    OutputFileHints outputFileHints) {
+                  throw new UnsupportedOperationException("should not be called");
+                }
+
+                @Nullable
+                @Override
+                public ResourceId unwindowedFilename(
+                    int shardNumber, int numShards, OutputFileHints outputFileHints) {
+                  throw new UnsupportedOperationException("should not be called");
+                }
+              },
+              SerializableFunctions.identity()));
     }
+
     @Override
-    public WriteOperation<Object> createWriteOperation() {
+    public WriteOperation<Void, Object> createWriteOperation() {
       throw new IllegalArgumentException("Should not be used");
     }
   }

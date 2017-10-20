@@ -19,6 +19,7 @@
 package org.apache.beam.sdk.io.gcp.bigquery;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -29,6 +30,7 @@ import java.io.Serializable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.coders.CoderException;
@@ -40,6 +42,7 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollectionView;
+import org.apache.beam.sdk.values.ShardedKey;
 import org.apache.beam.sdk.values.TupleTag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,15 +67,16 @@ class WriteBundlesToFiles<DestinationT>
   private transient Map<DestinationT, TableRowWriter> writers;
   private transient Map<DestinationT, BoundedWindow> writerWindows;
   private final PCollectionView<String> tempFilePrefixView;
-  private final TupleTag<KV<ShardedKey<DestinationT>, TableRow>> unwrittedRecordsTag;
+  private final TupleTag<KV<ShardedKey<DestinationT>, TableRow>> unwrittenRecordsTag;
   private int maxNumWritersPerBundle;
   private long maxFileSize;
+  private int spilledShardNumber;
 
   /**
    * The result of the {@link WriteBundlesToFiles} transform. Corresponds to a single output file,
    * and encapsulates the table it is destined to as well as the file byte size.
    */
-  public static final class Result<DestinationT> implements Serializable {
+  static final class Result<DestinationT> implements Serializable {
     private static final long serialVersionUID = 1L;
     public final String filename;
     public final Long fileByteSize;
@@ -83,6 +87,31 @@ class WriteBundlesToFiles<DestinationT>
       this.filename = filename;
       this.fileByteSize = fileByteSize;
       this.destination = destination;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (other instanceof Result) {
+        Result<DestinationT> o = (Result<DestinationT>) other;
+        return Objects.equals(this.filename, o.filename)
+            && Objects.equals(this.fileByteSize, o.fileByteSize)
+            && Objects.equals(this.destination, o.destination);
+      }
+      return  false;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(filename, fileByteSize, destination);
+    }
+
+    @Override
+    public String toString() {
+      return "Result{"
+          + "filename='" + filename + '\''
+          + ", fileByteSize=" + fileByteSize
+          + ", destination=" + destination
+          + '}';
     }
   }
 
@@ -131,11 +160,11 @@ class WriteBundlesToFiles<DestinationT>
 
   WriteBundlesToFiles(
       PCollectionView<String> tempFilePrefixView,
-      TupleTag<KV<ShardedKey<DestinationT>, TableRow>> unwrittedRecordsTag,
+      TupleTag<KV<ShardedKey<DestinationT>, TableRow>> unwrittenRecordsTag,
       int maxNumWritersPerBundle,
       long maxFileSize) {
     this.tempFilePrefixView = tempFilePrefixView;
-    this.unwrittedRecordsTag = unwrittedRecordsTag;
+    this.unwrittenRecordsTag = unwrittenRecordsTag;
     this.maxNumWritersPerBundle = maxNumWritersPerBundle;
     this.maxFileSize = maxFileSize;
   }
@@ -146,6 +175,7 @@ class WriteBundlesToFiles<DestinationT>
     // bundles.
     this.writers = Maps.newHashMap();
     this.writerWindows = Maps.newHashMap();
+    this.spilledShardNumber = ThreadLocalRandom.current().nextInt(SPILLED_RECORD_SHARDING_FACTOR);
   }
 
   TableRowWriter createAndInsertWriter(DestinationT destination, String tempFilePrefix,
@@ -172,9 +202,10 @@ class WriteBundlesToFiles<DestinationT>
       } else {
         // This means that we already had too many writers open in this bundle. "spill" this record
         // into the output. It will be grouped and written to a file in a subsequent stage.
-        c.output(unwrittedRecordsTag,
-            KV.of(ShardedKey.of(destination,
-                ThreadLocalRandom.current().nextInt(SPILLED_RECORD_SHARDING_FACTOR)),
+        c.output(
+            unwrittenRecordsTag,
+            KV.of(
+                ShardedKey.of(destination, (++spilledShardNumber) % SPILLED_RECORD_SHARDING_FACTOR),
                 c.element().getValue()));
         return;
       }

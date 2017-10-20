@@ -19,6 +19,7 @@ package org.apache.beam.sdk.io.gcp.bigquery;
 
 import com.google.api.services.bigquery.model.TableRow;
 import org.apache.beam.sdk.coders.KvCoder;
+import org.apache.beam.sdk.coders.ShardedKeyCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
@@ -29,6 +30,7 @@ import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionTuple;
+import org.apache.beam.sdk.values.ShardedKey;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.TupleTagList;
 
@@ -77,10 +79,11 @@ public class StreamingWriteTables extends PTransform<
     // get good batching into BigQuery's insert calls, and enough that we can max out the
     // streaming insert quota.
     PCollection<KV<ShardedKey<String>, TableRowInfo>> tagged =
-        input.apply("ShardTableWrites", ParDo.of
-        (new GenerateShardedTable(50)))
-        .setCoder(KvCoder.of(ShardedKeyCoder.of(StringUtf8Coder.of()), TableRowJsonCoder.of()))
-        .apply("TagWithUniqueIds", ParDo.of(new TagWithUniqueIds()));
+        input
+            .apply("ShardTableWrites", ParDo.of(new GenerateShardedTable(50)))
+            .setCoder(KvCoder.of(ShardedKeyCoder.of(StringUtf8Coder.of()), TableRowJsonCoder.of()))
+            .apply("TagWithUniqueIds", ParDo.of(new TagWithUniqueIds()))
+            .setCoder(KvCoder.of(ShardedKeyCoder.of(StringUtf8Coder.of()), TableRowInfoCoder.of()));
 
     // To prevent having the same TableRow processed more than once with regenerated
     // different unique ids, this implementation relies on "checkpointing", which is
@@ -89,7 +92,6 @@ public class StreamingWriteTables extends PTransform<
     TupleTag<Void> mainOutputTag = new TupleTag<>("mainOutput");
     TupleTag<TableRow> failedInsertsTag = new TupleTag<>("failedInserts");
     PCollectionTuple tuple = tagged
-        .setCoder(KvCoder.of(ShardedKeyCoder.of(StringUtf8Coder.of()), TableRowInfoCoder.of()))
         .apply(Reshuffle.<ShardedKey<String>, TableRowInfo>of())
         // Put in the global window to ensure that DynamicDestinations side inputs are accessed
         // correctly.

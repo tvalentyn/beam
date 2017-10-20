@@ -23,15 +23,17 @@ from __future__ import print_function
 
 import logging
 import unittest
-
 from concurrent import futures
+
 import grpc
 
 from apache_beam.portability.api import beam_fn_api_pb2
+from apache_beam.portability.api import beam_fn_api_pb2_grpc
+from apache_beam.portability.api import beam_runner_api_pb2
 from apache_beam.runners.worker import sdk_worker
 
 
-class BeamFnControlServicer(beam_fn_api_pb2.BeamFnControlServicer):
+class BeamFnControlServicer(beam_fn_api_pb2_grpc.BeamFnControlServicer):
 
   def __init__(self, requests, raise_errors=True):
     self.requests = requests
@@ -61,29 +63,28 @@ class BeamFnControlServicer(beam_fn_api_pb2.BeamFnControlServicer):
 class SdkWorkerTest(unittest.TestCase):
 
   def test_fn_registration(self):
-    fns = [beam_fn_api_pb2.FunctionSpec(id=str(ix)) for ix in range(4)]
-
-    process_bundle_descriptors = [beam_fn_api_pb2.ProcessBundleDescriptor(
-        id=str(100+ix),
-        primitive_transform=[
-            beam_fn_api_pb2.PrimitiveTransform(function_spec=fn)])
-                                  for ix, fn in enumerate(fns)]
+    process_bundle_descriptors = [
+        beam_fn_api_pb2.ProcessBundleDescriptor(
+            id=str(100+ix),
+            transforms={
+                str(ix): beam_runner_api_pb2.PTransform(unique_name=str(ix))})
+        for ix in range(4)]
 
     test_controller = BeamFnControlServicer([beam_fn_api_pb2.InstructionRequest(
         register=beam_fn_api_pb2.RegisterRequest(
             process_bundle_descriptor=process_bundle_descriptors))])
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    beam_fn_api_pb2.add_BeamFnControlServicer_to_server(test_controller, server)
+    beam_fn_api_pb2_grpc.add_BeamFnControlServicer_to_server(
+        test_controller, server)
     test_port = server.add_insecure_port("[::]:0")
     server.start()
 
-    channel = grpc.insecure_channel("localhost:%s" % test_port)
-    harness = sdk_worker.SdkHarness(channel)
+    harness = sdk_worker.SdkHarness("localhost:%s" % test_port)
     harness.run()
     self.assertEqual(
         harness.worker.fns,
-        {item.id: item for item in fns + process_bundle_descriptors})
+        {item.id: item for item in process_bundle_descriptors})
 
 
 if __name__ == "__main__":

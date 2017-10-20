@@ -24,9 +24,9 @@ import static org.junit.Assert.assertEquals;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.beam.model.pipeline.v1.RunnerApi.WindowIntoPayload;
 import org.apache.beam.sdk.Pipeline.PipelineVisitor;
 import org.apache.beam.sdk.coders.Coder;
-import org.apache.beam.sdk.common.runner.v1.RunnerApi.WindowIntoPayload;
 import org.apache.beam.sdk.io.GenerateSequence;
 import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy.Node;
@@ -95,7 +95,7 @@ public class WindowIntoTranslationTest {
     WindowIntoPayload payload =
         WindowIntoTranslation.toProto(assign.get().getTransform(), components);
 
-    assertEquals(windowFn, WindowIntoTranslation.getWindowFn(payload));
+    assertEquals(windowFn, WindowingStrategyTranslation.windowFnFromProto(payload.getWindowFn()));
   }
 
   private static class CustomWindows extends PartitioningWindowFn<String, BoundedWindow> {

@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
 import java.util.List;
 import java.util.Map;
+import org.apache.beam.model.pipeline.v1.RunnerApi;
 import org.apache.beam.runners.core.construction.PTransformReplacements;
 import org.apache.beam.runners.core.construction.PTransformTranslation.RawPTransform;
 import org.apache.beam.runners.core.construction.ReplacementOutputs;
@@ -72,13 +73,26 @@ public class SplittableParDoViaKeyedWorkItems {
           PCollection<KV<KeyT, InputT>>, PCollection<KeyedWorkItem<KeyT, InputT>>> {
     @Override
     public PCollection<KeyedWorkItem<KeyT, InputT>> expand(PCollection<KV<KeyT, InputT>> input) {
+      KvCoder<KeyT, InputT> kvCoder = (KvCoder<KeyT, InputT>) input.getCoder();
       return PCollection.createPrimitiveOutputInternal(
-          input.getPipeline(), WindowingStrategy.globalDefault(), input.isBounded());
+          input.getPipeline(),
+          WindowingStrategy.globalDefault(),
+          input.isBounded(),
+          KeyedWorkItemCoder.of(
+              kvCoder.getKeyCoder(),
+              kvCoder.getValueCoder(),
+              input.getWindowingStrategy().getWindowFn().windowCoder()));
     }
 
     @Override
     public String getUrn() {
       return SplittableParDo.SPLITTABLE_GBKIKWI_URN;
+    }
+
+    @Override
+    public RunnerApi.FunctionSpec getSpec() {
+      throw new UnsupportedOperationException(
+          String.format("%s should never be serialized to proto", getClass().getSimpleName()));
     }
   }
 
@@ -177,6 +191,7 @@ public class SplittableParDoViaKeyedWorkItems {
           original.getFn(),
           original.getMainOutputTag(),
           original.getAdditionalOutputTags(),
+          original.getOutputTagsToCoders(),
           original.getInputWindowingStrategy());
     }
   }
@@ -200,8 +215,8 @@ public class SplittableParDoViaKeyedWorkItems {
     /**
      * The state cell containing a watermark hold for the output of this {@link DoFn}. The hold is
      * acquired during the first {@link DoFn.ProcessElement} call for each element and restriction,
-     * and is released when the {@link DoFn.ProcessElement} call returns and there is no residual
-     * restriction captured by the {@link SplittableProcessElementInvoker}.
+     * and is released when the {@link DoFn.ProcessElement} call returns {@link
+     * ProcessContinuation#stop()}.
      *
      * <p>A hold is needed to avoid letting the output watermark immediately progress together with
      * the input watermark when the first {@link DoFn.ProcessElement} call for this element
@@ -365,11 +380,12 @@ public class SplittableParDoViaKeyedWorkItems {
       if (futureOutputWatermark == null) {
         futureOutputWatermark = elementAndRestriction.getKey().getTimestamp();
       }
+      Instant wakeupTime =
+          timerInternals.currentProcessingTime().plus(result.getContinuation().resumeDelay());
       holdState.add(futureOutputWatermark);
       // Set a timer to continue processing this element.
       timerInternals.setTimer(
-          TimerInternals.TimerData.of(
-              stateNamespace, timerInternals.currentProcessingTime(), TimeDomain.PROCESSING_TIME));
+          TimerInternals.TimerData.of(stateNamespace, wakeupTime, TimeDomain.PROCESSING_TIME));
     }
 
     private DoFn<InputT, OutputT>.StartBundleContext wrapContextAsStartBundle(
