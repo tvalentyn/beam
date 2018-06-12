@@ -84,11 +84,11 @@ def generate_windowed_int_value():
   return windowed_value.WindowedValue(
       value=random.randint(0, sys.maxsize),
       timestamp=12345678,
-      windows=[
+      windows=(
           window.IntervalWindow(50, 100),
           window.IntervalWindow(60, 110),
           window.IntervalWindow(70, 120),
-      ])
+      ))
 
 
 def run_coder_benchmarks(num_runs, input_size, seed, verbose=True):

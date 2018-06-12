@@ -185,11 +185,29 @@ class WindowedValue(object):
   def _key(self):
     return self.value, self.timestamp_micros, self.windows, self.pane_info
 
-  def __eq__(self, other):
+  # Remove py3 prefixes for A/B testing, rename __eq__ and __hash__ below.
+
+  def py3__eq__(self, other):
     return type(self) == type(other) and self._key() == other._key()
 
-  def __hash__(self):
+  def py3__hash__(self):
     return hash(self._key())
+
+  # faster implementation
+
+  def __eq__(self, other):
+    return (
+       type(self) == type(other)
+       and self.timestamp_micros == other.timestamp_micros
+       and self.value == self.value
+       and self.windows == self.windows
+       and self.pane_info == self.pane_info)
+
+  def __hash__(self):
+    return (hash(self.value) +
+            3 * self.timestamp_micros +
+            7 * hash(self.windows) +
+            11 * hash(self.pane_info))
 
   def with_value(self, new_value):
     """Creates a new WindowedValue with the same timestamps and windows as this.
