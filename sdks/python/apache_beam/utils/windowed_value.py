@@ -182,26 +182,12 @@ class WindowedValue(object):
         self.windows,
         self.pane_info)
 
-  def _key(self):
-    return self.value, self.timestamp_micros, self.windows, self.pane_info
-
-  # Remove py3 prefixes for A/B testing, rename __eq__ and __hash__ below.
-
-  def py3__eq__(self, other):
-    return type(self) == type(other) and self._key() == other._key()
-
-  def py3__hash__(self):
-    return hash(self._key())
-
-  # faster implementation
-
   def __eq__(self, other):
-    return (
-       type(self) == type(other)
-       and self.timestamp_micros == other.timestamp_micros
-       and self.value == self.value
-       and self.windows == self.windows
-       and self.pane_info == self.pane_info)
+    return (type(self) == type(other)
+            and self.timestamp_micros == other.timestamp_micros
+            and self.value == other.value
+            and self.windows == other.windows
+            and self.pane_info == other.pane_info)
 
   def __hash__(self):
     return (hash(self.value) +
