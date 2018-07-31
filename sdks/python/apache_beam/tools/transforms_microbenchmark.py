@@ -73,14 +73,16 @@ def sortable_object_benchmark_factory(generate_fn):
                           for _ in range(num_elements_per_benchmark)]
 
         def __call__(self):
-            self._heap = []
-            for e in self._list:
-                heapq.heappush(self._heap, e)
+            sorted(self._list)
+            return
+            # self._heap = []
+            # for e in self._list:
+            #     heapq.heappush(self._heap, e)
 
-            for _ in range(len(self._list)):
-                heapq.heappop(self._heap)
+            # for _ in range(len(self._list)):
+            #     heapq.heappop(self._heap)
 
-    SortableObjectsBenchmark.__name__ = "%s: priority queue" % (
+    SortableObjectsBenchmark.__name__ = "%s: sorting." % (
         generate_fn.__name__)
 
     return SortableObjectsBenchmark
@@ -90,7 +92,7 @@ def interval_window():
     return window.IntervalWindow(random.randint(1000000000, 1500000000), random.randint(1500000000, 2000000000))
 
 
-def timestamped_window():
+def timestamped_value():
     return window.TimestampedValue(random.randint(0, 1000), random.randint(1500000000, 2000000000))
 
 
@@ -131,9 +133,9 @@ def run_windowed_value_benchmarks(num_runs, input_size, seed, verbose=True):
         # hashable_object_benchmark_factory(coders_microbenchmark.wv_with_one_window),
         # hashable_object_benchmark_factory(coders_microbenchmark.wv_with_multiple_windows),
         hashable_object_benchmark_factory(interval_window),
-        hashable_object_benchmark_factory(timestamped_window),
+        hashable_object_benchmark_factory(timestamped_value),
         sortable_object_benchmark_factory(interval_window),
-        sortable_object_benchmark_factory(timestamped_window),
+        sortable_object_benchmark_factory(timestamped_value),
         sortable_object_benchmark_factory(bounded_window),
     ]
 
