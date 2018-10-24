@@ -21,6 +21,7 @@ from __future__ import absolute_import
 
 import logging
 import unittest
+import sys
 
 from nose.plugins.attrib import attr
 
@@ -28,6 +29,7 @@ import apache_beam as beam
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
+from apache_beam.testing.util import beam_tracefunc
 from apache_beam.transforms import window
 
 
@@ -172,12 +174,15 @@ class SideInputsTest(unittest.TestCase):
 
   @attr('ValidatesRunner')
   def test_iterable_side_input(self):
+    sys.setprofile(beam_tracefunc)
+
     pipeline = self.create_pipeline()
     pcol = pipeline | 'start' >> beam.Create([1, 2])
     side = pipeline | 'side' >> beam.Create([3, 4])  # 2 values in side input.
     result = pcol | 'compute' >> beam.FlatMap(
         lambda x, s: [x * y for y in s],
         beam.pvalue.AsIter(side))
+
     assert_that(result, equal_to([3, 4, 6, 8]))
     pipeline.run()
 

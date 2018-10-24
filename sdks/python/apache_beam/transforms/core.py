@@ -1188,6 +1188,7 @@ class CombineGlobally(PTransform):
   fanout = None
 
   def __init__(self, fn, *args, **kwargs):
+    print("Combine", args, kwargs)
     if not (isinstance(fn, CombineFn) or callable(fn)):
       raise TypeError(
           'CombineGlobally can be used only with combineFn objects. '

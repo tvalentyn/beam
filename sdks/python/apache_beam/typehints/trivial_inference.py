@@ -245,6 +245,7 @@ def infer_return_type(c, input_types, debug=False, depth=5):
     A TypeConstraint that that the return value of this function will (likely)
     satisfy given the specified inputs.
   """
+  return Any
   try:
     if hashable(c) and c in known_return_types:
       return known_return_types[c]
@@ -294,6 +295,7 @@ def infer_return_type_func(f, input_types, debug=False, depth=0):
   Raises:
     TypeInferenceError: if no type can be inferred.
   """
+  raise TypeInferenceError("Unable to handle")
   if debug:
     print()
     print(f, id(f), input_types)
