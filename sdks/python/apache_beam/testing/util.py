@@ -224,9 +224,9 @@ def beam_tracefunc(frame, event, arg, indent=[0]):
   beam_root = "sdks/python/apache_beam/"
   methods_of_interest = [
     # "",
-    "_invoke_per_window",
-    "to_runner_api",
-    "process_bundle",
+    # "_invoke_per_window",
+    # "to_runner_api",
+    # "process_bundle",
   ]
 
 
