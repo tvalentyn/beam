@@ -46,7 +46,7 @@ function mkpy3env()
 mkenv py27env
 git clean -fdx
 python ./setup.py sdist
-pip install ./dist/apache-beam-2.8.0.dev0.tar.gz[test]
+pip install ./dist/apache-beam-2.9.0.dev0.tar.gz[test]
 python ./setup.py test -s $TEST_NAME &> $PY2_EXECUTION_OUT || true
 
 export BEAM_EXPERIMENTAL_PY3=1
@@ -54,7 +54,7 @@ mkpy3env py3env
 git clean -fdx
 
 python ./setup.py sdist
-pip install ./dist/apache-beam-2.8.0.dev0.tar.gz[test]
+pip install ./dist/apache-beam-2.9.0.dev0.tar.gz[test]
 python ./setup.py test -s $TEST_NAME &> $PY3_EXECUTION_OUT || true
 
 < $PY2_EXECUTION_OUT grep @@ > $PY2_EXECUTION_FILTERED
