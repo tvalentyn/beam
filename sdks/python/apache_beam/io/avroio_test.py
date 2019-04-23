@@ -1,4 +1,4 @@
-#
+
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -280,8 +280,10 @@ class TestAvro(unittest.TestCase):
     self._run_avro_test(file_name, 10000, True, expected_result)
 
   def test_split_points(self):
-    num_records = 12000
-    file_name = self._write_data(count=num_records)
+    from apache_beam.testing.util import beam_tracefunc
+    sys.setprofile(beam_tracefunc)
+
+    file_name = self._write_data(count=12000)
     source = _create_avro_source(file_name, use_fastavro=self.use_fastavro)
 
     splits = [
@@ -312,8 +314,8 @@ class TestAvro(unittest.TestCase):
         [(0, iobase.RangeTracker.SPLIT_POINTS_UNKNOWN)] * 10)
 
     # When reading records of last block, range_tracker.split_points() should
-    # return (num_blocks - 1, 1)
-    self.assertEqual(split_points_report[-10:], [(num_blocks - 1, 1)] * 10)
+    # return (2, 1)
+    self.assertEquals(split_points_report[-10:], [(2, 1)] * 10)
 
   def test_read_without_splitting_compressed_deflate(self):
     file_name = self._write_data(codec='deflate')

@@ -414,6 +414,7 @@ class _AvroSource(filebasedsource.FileBasedSource):
       while range_tracker.try_claim(next_block_start):
         block = _AvroUtils.read_block_from_file(f, codec, schema_string,
                                                 sync_marker)
+        print("^^^ ", block.offset(), " ", block.size())
         next_block_start = block.offset() + block.size()
         for record in block.records():
           yield record
@@ -464,6 +465,7 @@ class _FastAvroSource(filebasedsource.FileBasedSource):
 
       while range_tracker.try_claim(next_block_start):
         block = next(blocks)
+        print("^^^", " ", block.offset, " ", block.size)
         next_block_start = block.offset + block.size
         for record in block:
           yield record

@@ -236,3 +236,64 @@ def open_shards(glob_pattern, mode='rt', encoding='utf-8'):
         out_file.write(in_file.read())
     concatenated_file_name = out_file.name
   return io.open(concatenated_file_name, mode, encoding=encoding)
+
+
+def beam_tracefunc(frame, event, arg, indent=[0]):
+  import inspect
+  beam_root = "sdks/python/apache_beam/"
+
+  def get_caller():
+    stack = inspect.stack()
+    start = 3
+    if len(stack) < start + 1:
+      return ''
+    frame = stack[start][0]
+    func_filename = frame.f_code.co_filename
+    func_filename = func_filename[func_filename.find(beam_root)+len(beam_root):]
+    return frame.f_code.co_name + " " + func_filename + " :" + str(frame.f_lineno)
+
+  co = frame.f_code
+  func_filename = co.co_filename
+  func_name = frame.f_code.co_name
+
+  beam_root = "sdks/python/apache_beam/"
+  methods_of_interest_ = []
+  methods_of_interest = [
+    # "",
+    "_invoke_per_window",
+    "to_runner_api",
+    "process_bundle",
+  ]
+
+  methods_exclude = [
+    "split_points_unclaimed",
+    "split_points",
+    "read_records",
+    "stop_position",
+  ]
+
+  if (beam_root in func_filename
+      and (not methods_of_interest or func_name in methods_of_interest)
+      and func_name not in methods_exclude
+      and "pickle" not in func_filename
+  ):
+    func_filename = func_filename[func_filename.find(beam_root)+len(beam_root):]
+    if event == "call":
+      try:
+        f_args = str(inspect.getargvalues(frame))
+      except:
+        f_args = ""
+      indent[0] += 2
+      print("@@" + "-" * indent[0] + "> call function " +
+            func_name + " " + func_filename + " :" + str(frame.f_lineno) +
+            "(" + f_args + ")" + " called from " + get_caller())
+    elif event == "return":
+      try:
+        return_value = str(arg)
+      except:
+        return_value = "Undef"
+      print("@@<" + "-" * indent[0] + " exit function " + func_name + " " +
+            func_filename + " :" + str(frame.f_lineno) + " return value: " +
+            return_value + " going back to " + get_caller())
+      indent[0] -= 2
+  return beam_tracefunc
