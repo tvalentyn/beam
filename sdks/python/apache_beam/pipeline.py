@@ -596,7 +596,9 @@ class Pipeline(object):
           pickler.loads(pickler.dumps(transform_node.transform,
                                       enable_trace=False),
                         enable_trace=False)
-        except Exception:
+        except RecursionError as e:
+          import sys
+          print("Caught %s. Current recursionlimit is %d" % (e, sys.getrecursionlimit()))
           Visitor.ok = False
 
       def visit_value(self, value, _):

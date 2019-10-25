@@ -231,56 +231,59 @@ class DataflowRunnerTest(unittest.TestCase):
       p.run()
 
   def test_remote_runner_display_data(self):
-    remote_runner = DataflowRunner()
-    p = Pipeline(remote_runner,
-                 options=PipelineOptions(self.default_properties))
+    for lim in range(1002, 1010):
+      sys.setrecursionlimit(lim)
+      print("Recursion limit set to: %d" % sys.getrecursionlimit())
+      remote_runner = DataflowRunner()
+      p = Pipeline(remote_runner,
+                   options=PipelineOptions(self.default_properties))
 
-    # TODO: Should not subclass ParDo. Switch to PTransform as soon as
-    # composite transforms support display data.
-    class SpecialParDo(beam.ParDo):
-      def __init__(self, fn, now):
-        super(SpecialParDo, self).__init__(fn)
-        self.fn = fn
-        self.now = now
+      # TODO: Should not subclass ParDo. Switch to PTransform as soon as
+      # composite transforms support display data.
+      class SpecialParDo(beam.ParDo):
+        def __init__(self, fn, now):
+          super(SpecialParDo, self).__init__(fn)
+          self.fn = fn
+          self.now = now
 
-      # Make this a list to be accessible within closure
-      def display_data(self):
-        return {'asubcomponent': self.fn,
-                'a_class': SpecialParDo,
-                'a_time': self.now}
+        # Make this a list to be accessible within closure
+        def display_data(self):
+          return {'asubcomponent': self.fn,
+                  'a_class': SpecialParDo,
+                  'a_time': self.now}
 
-    class SpecialDoFn(beam.DoFn):
-      def display_data(self):
-        return {'dofn_value': 42}
+      class SpecialDoFn(beam.DoFn):
+        def display_data(self):
+          return {'dofn_value': 42}
 
-      def process(self):
-        pass
+        def process(self):
+          pass
 
-    now = datetime.now()
-    # pylint: disable=expression-not-assigned
-    (p | ptransform.Create([1, 2, 3, 4, 5])
-     | 'Do' >> SpecialParDo(SpecialDoFn(), now))
+      now = datetime.now()
+      # pylint: disable=expression-not-assigned
+      (p | ptransform.Create([1, 2, 3, 4, 5])
+       | 'Do' >> SpecialParDo(SpecialDoFn(), now))
 
-    p.run()
-    job_dict = json.loads(str(remote_runner.job))
-    steps = [step
-             for step in job_dict['steps']
-             if len(step['properties'].get('display_data', [])) > 0]
-    step = steps[1]
-    disp_data = step['properties']['display_data']
-    disp_data = sorted(disp_data, key=lambda x: x['namespace']+x['key'])
-    nspace = SpecialParDo.__module__+ '.'
-    expected_data = [{'type': 'TIMESTAMP', 'namespace': nspace+'SpecialParDo',
-                      'value': DisplayDataItem._format_value(now, 'TIMESTAMP'),
-                      'key': 'a_time'},
-                     {'type': 'STRING', 'namespace': nspace+'SpecialParDo',
-                      'value': nspace+'SpecialParDo', 'key': 'a_class',
-                      'shortValue': 'SpecialParDo'},
-                     {'type': 'INTEGER', 'namespace': nspace+'SpecialDoFn',
-                      'value': 42, 'key': 'dofn_value'}]
-    expected_data = sorted(expected_data, key=lambda x: x['namespace']+x['key'])
-    self.assertEqual(len(disp_data), 3)
-    self.assertEqual(disp_data, expected_data)
+      p.run()
+      job_dict = json.loads(str(remote_runner.job))
+      steps = [step
+               for step in job_dict['steps']
+               if len(step['properties'].get('display_data', [])) > 0]
+      step = steps[1]
+      disp_data = step['properties']['display_data']
+      disp_data = sorted(disp_data, key=lambda x: x['namespace']+x['key'])
+      nspace = SpecialParDo.__module__+ '.'
+      expected_data = [{'type': 'TIMESTAMP', 'namespace': nspace+'SpecialParDo',
+                        'value': DisplayDataItem._format_value(now, 'TIMESTAMP'),
+                        'key': 'a_time'},
+                       {'type': 'STRING', 'namespace': nspace+'SpecialParDo',
+                        'value': nspace+'SpecialParDo', 'key': 'a_class',
+                        'shortValue': 'SpecialParDo'},
+                       {'type': 'INTEGER', 'namespace': nspace+'SpecialDoFn',
+                        'value': 42, 'key': 'dofn_value'}]
+      expected_data = sorted(expected_data, key=lambda x: x['namespace']+x['key'])
+      self.assertEqual(len(disp_data), 3)
+      self.assertEqual(disp_data, expected_data)
 
   def test_no_group_by_key_directly_after_bigquery(self):
     remote_runner = DataflowRunner()
