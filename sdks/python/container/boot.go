@@ -142,6 +142,7 @@ func main() {
 	os.Setenv("SEMI_PERSISTENT_DIRECTORY", *semiPersistDir)
 	os.Setenv("LOGGING_API_SERVICE_DESCRIPTOR", proto.MarshalTextString(&pbpipeline.ApiServiceDescriptor{Url: *loggingEndpoint}))
 	os.Setenv("CONTROL_API_SERVICE_DESCRIPTOR", proto.MarshalTextString(&pbpipeline.ApiServiceDescriptor{Url: *controlEndpoint}))
+	os.Setenv("LD_PRELOAD", "/usr/lib/x86_64-linux-gnu/libjemalloc.so")
 
 	args := []string{
 		"-m",

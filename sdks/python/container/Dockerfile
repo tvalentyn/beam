@@ -23,6 +23,8 @@ MAINTAINER "Apache Beam <dev@beam.apache.org>"
 # Install native bindings required for dependencies.
 RUN apt-get update && \
     apt-get install -y \
+       # Install Jemalloc memory allocator, https://github.com/jemalloc.
+       libjemalloc-dev \
        # These packages are needed for "pip install python-snappy" below.
        libsnappy-dev \
        # This package is needed for "pip install pyyaml" below to have c bindings.

@@ -59,6 +59,7 @@ google-cloud-datastore==1.7.4
 # Optional packages
 cython==0.29.10
 python-snappy==0.5.4
+tweepy==3.8.0
 
 # These are additional packages likely to be used by customers.
 numpy==1.16.4
