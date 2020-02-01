@@ -169,13 +169,6 @@ class ParDoTest(LoadTest):
               MeasureTime(self.metrics_namespace))
          )
 
-    for i in range(self.iterations):
-      pc = (pc
-            | 'Step: %d' % i >> beam.ParDo(
-                CounterOperation(self.number_of_counters,
-                                 self.number_of_operations))
-           )
-
     # pylint: disable=expression-not-assigned
     (pc
      | 'Measure time: End' >> beam.ParDo(MeasureTime(self.metrics_namespace))

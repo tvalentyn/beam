@@ -70,8 +70,10 @@ class LoadTest(unittest.TestCase):
 
   def tearDown(self):
     if not hasattr(self, 'result'):
-      self.result = self.pipeline.run()
-      self.result.wait_until_finish()
+      print("@@@ 1")
+      import  cProfile
+      cProfile.runctx('self.pipeline.run()', globals(), locals())
+      print("@@@ 3")
 
     if self.metrics_monitor:
       self.metrics_monitor.publish_metrics(self.result)
