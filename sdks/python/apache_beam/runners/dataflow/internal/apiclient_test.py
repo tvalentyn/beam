@@ -842,45 +842,6 @@ class UtilTest(unittest.TestCase):
     self.assertEqual(
         'Apache Beam Python 3.5 SDK', environment._get_python_sdk_name())
 
-  @mock.patch(
-      'apache_beam.runners.dataflow.internal.apiclient.sys.version_info',
-      (2, 7))
-  def test_interpreter_version_check_passes_py27(self):
-    pipeline_options = PipelineOptions([])
-    apiclient._verify_interpreter_version_is_supported(pipeline_options)
-
-  @mock.patch(
-      'apache_beam.runners.dataflow.internal.apiclient.sys.version_info',
-      (3, 5, 2))
-  def test_interpreter_version_check_passes_py352(self):
-    pipeline_options = PipelineOptions([])
-    apiclient._verify_interpreter_version_is_supported(pipeline_options)
-
-  @mock.patch(
-      'apache_beam.runners.dataflow.internal.apiclient.sys.version_info',
-      (3, 5, 6))
-  def test_interpreter_version_check_passes_py356(self):
-    pipeline_options = PipelineOptions([])
-    apiclient._verify_interpreter_version_is_supported(pipeline_options)
-
-  @mock.patch(
-      'apache_beam.runners.dataflow.internal.apiclient.sys.version_info',
-      (3, 9, 0))
-  def test_interpreter_version_check_passes_with_experiment(self):
-    pipeline_options = PipelineOptions(
-        ["--experiment=ignore_py3_minor_version"])
-    apiclient._verify_interpreter_version_is_supported(pipeline_options)
-
-  @mock.patch(
-      'apache_beam.runners.dataflow.internal.apiclient.sys.version_info',
-      (3, 9, 0))
-  def test_interpreter_version_check_fails_py39(self):
-    pipeline_options = PipelineOptions([])
-    self.assertRaises(
-        Exception,
-        apiclient._verify_interpreter_version_is_supported,
-        pipeline_options)
-
   def test_use_unified_worker(self):
     pipeline_options = PipelineOptions([])
     self.assertFalse(apiclient._use_unified_worker(pipeline_options))
