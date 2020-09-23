@@ -178,7 +178,6 @@ class Environment(object):
     ])
     # Version information.
     self.proto.version = dataflow.Environment.VersionValue()
-    _verify_interpreter_version_is_supported(options)
     if self.standard_options.streaming:
       job_type = 'FNAPI_STREAMING'
     else:
@@ -1071,21 +1070,6 @@ def get_container_image_from_options(pipeline_options):
   if worker_options.worker_harness_container_image:
     return worker_options.worker_harness_container_image
 
-  if sys.version_info[0] == 2:
-    version_suffix = ''
-  elif sys.version_info[0:2] == (3, 5):
-    version_suffix = '3'
-  elif sys.version_info[0:2] == (3, 6):
-    version_suffix = '36'
-  elif sys.version_info[0:2] == (3, 7):
-    version_suffix = '37'
-  elif sys.version_info[0:2] == (3, 8):
-    version_suffix = '38'
-  else:
-    raise Exception(
-        'Dataflow only supports Python versions 2 and 3.5+, got: %s' %
-        str(sys.version_info[0:2]))
-
   use_fnapi = _use_fnapi(pipeline_options)
   # TODO(tvalentyn): Use enumerated type instead of strings for job types.
   if use_fnapi:
@@ -1093,6 +1077,7 @@ def get_container_image_from_options(pipeline_options):
   else:
     fnapi_suffix = ''
 
+  version_suffix = '%s%s' % (sys.version_info[0:2])
   image_name = '{repository}/python{version_suffix}{fnapi_suffix}'.format(
       repository=names.DATAFLOW_CONTAINER_IMAGE_REPOSITORY,
       version_suffix=version_suffix,
@@ -1142,22 +1127,6 @@ def get_runner_harness_container_image():
 def get_response_encoding():
   """Encoding to use to decode HTTP response from Google APIs."""
   return None if sys.version_info[0] < 3 else 'utf8'
-
-
-def _verify_interpreter_version_is_supported(pipeline_options):
-  if sys.version_info[0:2] in [(2, 7), (3, 5), (3, 6), (3, 7), (3, 8)]:
-    return
-
-  debug_options = pipeline_options.view_as(DebugOptions)
-  if (debug_options.experiments and
-      'ignore_py3_minor_version' in debug_options.experiments):
-    return
-
-  raise Exception(
-      'Dataflow runner currently supports Python versions '
-      '2.7, 3.5, 3.6, 3.7 and 3.8. To ignore this requirement and start a job '
-      'using a different version of Python 3 interpreter, pass '
-      '--experiment ignore_py3_minor_version pipeline option.')
 
 
 # To enable a counter on the service, add it to this dictionary.
