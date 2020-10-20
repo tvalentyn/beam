@@ -324,7 +324,7 @@ class BeamModulePlugin implements Plugin<Project> {
 
     // Automatically use the official release version if we are performing a release
     // otherwise append '-SNAPSHOT'
-    project.version = '2.26.0'
+    project.version = '2.27.0'
     if (!isRelease(project)) {
       project.version += '-SNAPSHOT'
     }
@@ -1960,7 +1960,7 @@ class BeamModulePlugin implements Plugin<Project> {
       // If none of them applied, version set here will be used as default value. Currently
       // the minimum version supported by Beam is 3.6
       project.ext.pythonVersion = project.hasProperty('pythonVersion') ?
-          project.pythonVersion : '3.6'
+          project.pythonVersion : '3.8'
 
       project.task('setupVirtualenv')  {
         doLast {
