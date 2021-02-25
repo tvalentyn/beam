@@ -100,10 +100,12 @@ class Environment(object):
   def __init__(self,
                capabilities,  # type: Iterable[str]
                artifacts,  # type: Iterable[beam_runner_api_pb2.ArtifactInformation]
+               resource_hints,  # type: Dict[str, str]
               ):
     # type: (...) -> None
     self._capabilities = capabilities
     self._artifacts = artifacts
+    self._resource_hints = resource_hints
 
   def artifacts(self):
     # type: () -> Iterable[beam_runner_api_pb2.ArtifactInformation]
@@ -116,6 +118,10 @@ class Environment(object):
   def capabilities(self):
     # type: () -> Iterable[str]
     return self._capabilities
+
+  def resource_hints(self):
+    # type: () -> Dict[str, str]
+    return self._resource_hints
 
   @classmethod
   @overload
@@ -193,7 +199,9 @@ class Environment(object):
         (isinstance(typed_param, bytes) or
          typed_param is None) else typed_param.encode('utf-8'),
         capabilities=self.capabilities(),
-        dependencies=self.artifacts())
+        dependencies=self.artifacts(),
+        # resource_hints
+    )
 
   @classmethod
   def from_runner_api(cls,
