@@ -74,24 +74,27 @@ def run(argv=None, save_main_session=True):
   with beam.Pipeline(options=pipeline_options) as p:
 
     # Read the text file[pattern] into a PCollection.
-    lines = p | 'Read' >> ReadFromText(known_args.input)
 
-    counts = (
-        lines
-        | 'Split' >>
-        (beam.ParDo(WordExtractingDoFn()).with_output_types(unicode))
-        | 'PairWIthOne' >> beam.Map(lambda x: (x, 1))
-        | 'GroupAndSum' >> beam.CombinePerKey(sum))
+    pairs = p | beam.Create([1, 2, 3]) | beam.Map(lambda x: (x, 1)).with_resource_hints(pipeline_hint="True")
 
-    # Format the counts into a PCollection of strings.
-    def format_result(word, count):
-      return '%s: %d' % (word, count)
-
-    output = counts | 'Format' >> beam.MapTuple(format_result)
-
-    # Write the output using a "Write" transform that has side effects.
-    # pylint: disable=expression-not-assigned
-    output | 'Write' >> WriteToText(known_args.output)
+    # lines = p | 'Read' >> ReadFromText(known_args.input)
+    #
+    # counts = (
+    #     lines
+    #     | 'Split' >>
+    #     (beam.ParDo(WordExtractingDoFn()).with_resource_hints(hint_set_in_the_pipeline=b"True").with_output_types(unicode))
+    #     | 'PairWIthOne' >> beam.Map(lambda x: (x, 1))
+    #     | 'GroupAndSum' >> beam.CombinePerKey(sum))
+    #
+    # # Format the counts into a PCollection of strings.
+    # def format_result(word, count):
+    #   return '%s: %d' % (word, count)
+    #
+    # output = counts | 'Format' >> beam.MapTuple(format_result)
+    #
+    # # Write the output using a "Write" transform that has side effects.
+    # # pylint: disable=expression-not-assigned
+    # output | 'Write' >> WriteToText(known_args.output)
 
 
 if __name__ == '__main__':

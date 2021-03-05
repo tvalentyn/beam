@@ -220,6 +220,20 @@ class PipelineContext(object):
     self.iterable_state_read = iterable_state_read
     self.iterable_state_write = iterable_state_write
     self._requirements = set(requirements)
+    self._resource_hints_to_env_map = {}
+
+  def get_environment_that_satisfies_hints(self, resource_hints):
+    return #...
+    default_env = self.default_environment_id()
+    assert default_env is not None
+    if not self._resource_hints_to_env_map:
+      import copy
+      self._resource_hints_to_env_map = copy.deepcopy(default_env)
+      self._resource_hints_to_env_map.resource_hints["DEBUG_ADDED_DURING_TRANSLATION"] = b"True"
+    return self._resource_hints_to_env_map
+
+
+
 
   def add_requirement(self, requirement):
     # type: (str) -> None

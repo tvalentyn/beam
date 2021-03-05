@@ -312,6 +312,8 @@ class ExternalTransform(ptransform.PTransform):
         namespace=self._external_namespace,  # type: ignore  # mypy thinks self._namespace is threading.local
         transform=transform_proto)
 
+    # TODO: how to populate hints in environments during expansion?
+
     with self._service() as service:
       response = service.Expand(request)
       if response.error:

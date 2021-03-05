@@ -501,7 +501,11 @@ class DataflowRunner(PipelineRunner):
       self._default_environment = (
           environments.DockerEnvironment.from_container_image(
               apiclient.get_container_image_from_options(options),
-              artifacts=environments.python_sdk_dependencies(options)))
+              artifacts=environments.python_sdk_dependencies(options),
+              resource_hints={'DEBUG_DEFAULT_ENV': b'True', 'SECOND_KEY': b'False'}
+          ))
+
+    # TODO: Add command-specified hints to default env? Parse command_line options in from_xxx methods on each environmnent?
 
     # This has to be performed before pipeline proto is constructed to make sure
     # that the changes are reflected in the portable job submission path.
@@ -1520,6 +1524,9 @@ class DataflowRunner(PipelineRunner):
     except RuntimeError:
       pass
     return None
+
+  def get_default_environment(self):
+    return self._default_environment
 
 
 class _DataflowSideInput(beam.pvalue.AsSideInput):

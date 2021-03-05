@@ -1808,3 +1808,17 @@ message ExecutableStagePayload {
     }
   }
 }
+
+message StandardResourceHints {
+  enum Enum {
+    // TODO - discuss types.
+    CPU = 0 [(beam_urn) = "beam:resources:cpu:v1"]; // TODO
+
+    MEMORY = 1 [(beam_urn) = "beam:resources:ram:v1"]; // TODO
+
+    ACCELERATOR_TYPE = 2 [(beam_urn) = "beam:resources:accelerator_type:v1"]; // TODO
+
+    ACCELERATOR_COUNT = 3 [(beam_urn) = "beam:resources:accelerator_count:v1"]; // TODO
+  }
+}
+

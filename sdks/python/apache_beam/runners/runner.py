@@ -242,6 +242,12 @@ class PipelineRunner(object):
     """Whether to enable the beam_fn_api experiment by default."""
     return True
 
+  def get_default_environment(self):
+    """Provides default environment for portable pipeline execution."""
+    # Must be implemented by portable runners.
+    assert not self.is_fnapi_compatible()
+    return None
+
 
 class PValueCache(object):
   """For internal use only; no backwards-compatibility guarantees.

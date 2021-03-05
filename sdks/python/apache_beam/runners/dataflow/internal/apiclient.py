@@ -647,6 +647,7 @@ class DataflowApplicationClient(object):
         'Completed GCS upload to %s in %s seconds.',
         gcs_location,
         int(time.time() - start_time))
+    sys.exit(0)
     return response
 
   @retry.no_retries  # Using no_retries marks this as an integration point.

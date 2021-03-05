@@ -85,6 +85,7 @@ from apache_beam.options.pipeline_options_validator import PipelineOptionsValida
 from apache_beam.portability import common_urns
 from apache_beam.runners import PipelineRunner
 from apache_beam.runners import create_runner
+from apache_beam.transforms import environments
 from apache_beam.transforms import ParDo
 from apache_beam.transforms import ptransform
 from apache_beam.transforms.sideinputs import get_sideinput_index
@@ -100,7 +101,6 @@ if TYPE_CHECKING:
   from apache_beam.portability.api import beam_runner_api_pb2
   from apache_beam.runners.pipeline_context import PipelineContext
   from apache_beam.runners.runner import PipelineResult
-  from apache_beam.transforms import environments
 
 __all__ = ['Pipeline', 'PTransformOverride']
 
@@ -524,10 +524,14 @@ class Pipeline(object):
 
       # When possible, invoke a round trip through the runner API.
       if test_runner_api and self._verify_runner_api_compatible():
-        return Pipeline.from_runner_api(
-            self.to_runner_api(use_fake_coders=True),
+        default_environment = self.runner.get_default_environment()
+        runner_api_representation = self.to_runner_api(use_fake_coders=True, default_environment=self.runner.get_default_environment())
+        x = Pipeline.from_runner_api(
+            runner_api_representation,
             self.runner,
-            self._options).run(False)
+            self._options)
+        x = x.run(False)
+        return x
 
       if (self._options.view_as(TypeOptions).runtime_type_check and
           self._options.view_as(TypeOptions).performance_runtime_type_check):
@@ -1149,9 +1153,10 @@ class AppliedPTransform(object):
 
   def to_runner_api(self, context):
     # type: (PipelineContext) -> beam_runner_api_pb2.PTransform
-    # External tranforms require more splicing than just setting the spec.
+    # External transforms require more splicing than just setting the spec.
     from apache_beam.transforms import external
     if isinstance(self.transform, external.ExternalTransform):
+      # TODO resource hints?
       return self.transform.to_runner_api_transform(context, self.full_label)
 
     from apache_beam.portability.api import beam_runner_api_pb2
@@ -1176,13 +1181,17 @@ class AppliedPTransform(object):
     # Iterate over inputs and outputs by sorted key order, so that ids are
     # consistently generated for multiple runs of the same pipeline.
     transform_spec = transform_to_runner_api(self.transform, context)
+    # TODO: When is self.environment_id already populated?
     environment_id = self.environment_id
     transform_urn = transform_spec.urn if transform_spec else None
     if (not environment_id and
         (transform_urn not in Pipeline.runner_implemented_transforms())):
+      if self.transform and self.transform.get_resource_hints():
+        environment_id = context.get_environment_that_satisfies_hints(self.transform.get_resource_hints())
+
       environment_id = context.default_environment_id()
 
-    return beam_runner_api_pb2.PTransform(
+    x = beam_runner_api_pb2.PTransform(
         unique_name=self.full_label,
         spec=transform_spec,
         subtransforms=[
@@ -1202,6 +1211,7 @@ class AppliedPTransform(object):
         environment_id=environment_id,
         # TODO(BEAM-366): Add display_data.
         display_data=None)
+    return x
 
   @staticmethod
   def from_runner_api(

@@ -336,7 +336,7 @@ class PTransform(WithTypeHints, HasDisplayData):
 
   The expand() method of the CustomTransform object passed in will be called
   with input as an argument.
-    """
+  """
   # By default, transforms don't have any side inputs.
   side_inputs = ()  # type: Sequence[pvalue.AsSideInput]
 
@@ -351,8 +351,13 @@ class PTransform(WithTypeHints, HasDisplayData):
 
   def with_resource_hints(self, **kwargs):
     # TODO: validation for typos?
-    self._resource_hints = kwargs
+    # TODO: reconciliation with pipeline options logic?
+    self._resource_hints = dict(kwargs, debug='True')
     return self
+
+  def get_resource_hints(self):
+    ## return dict(self._resource_hints)
+    return self._resource_hints
 
   def __init__(self, label=None):
     # type: (Optional[str]) -> None
