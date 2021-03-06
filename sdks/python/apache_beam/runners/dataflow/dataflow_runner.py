@@ -488,22 +488,7 @@ class DataflowRunner(PipelineRunner):
     if use_fnapi and not apiclient._use_unified_worker(options):
       pipeline.replace_all(DataflowRunner._JRH_PTRANSFORM_OVERRIDES)
 
-    from apache_beam.transforms import environments
-    if options.view_as(SetupOptions).prebuild_sdk_container_engine:
-      # if prebuild_sdk_container_engine is specified we will build a new sdk
-      # container image with dependencies pre-installed and use that image,
-      # instead of using the inferred default container image.
-      self._default_environment = (
-          environments.DockerEnvironment.from_options(options))
-      options.view_as(WorkerOptions).worker_harness_container_image = (
-          self._default_environment.container_image)
-    else:
-      self._default_environment = (
-          environments.DockerEnvironment.from_container_image(
-              apiclient.get_container_image_from_options(options),
-              artifacts=environments.python_sdk_dependencies(options),
-              resource_hints={'DEBUG_DEFAULT_ENV': b'True', 'SECOND_KEY': b'False'}
-          ))
+    self._default_environment = self.get_default_environment(options)
 
     # TODO: Add command-specified hints to default env? Parse command_line options in from_xxx methods on each environmnent?
 
@@ -1525,8 +1510,29 @@ class DataflowRunner(PipelineRunner):
       pass
     return None
 
-  def get_default_environment(self):
-    return self._default_environment
+  def get_default_environment(self, options):
+    from apache_beam.transforms import environments
+    if options.view_as(SetupOptions).prebuild_sdk_container_engine:
+      # if prebuild_sdk_container_engine is specified we will build a new sdk
+      # container image with dependencies pre-installed and use that image,
+      # instead of using the inferred default container image.
+      return (
+        environments.DockerEnvironment.from_options(options))
+      options.view_as(WorkerOptions).worker_harness_container_image = (
+        self._default_environment.container_image)
+    else:
+      # Local import same as above to "avoid adding the dependency for local
+      # running scenarios". Unclear if requirement still relevant.
+      # pylint: disable=wrong-import-order, wrong-import-position
+      from apache_beam.runners.dataflow.internal import apiclient
+      return (
+        environments.DockerEnvironment.from_container_image(
+            apiclient.get_container_image_from_options(options),
+            artifacts=environments.python_sdk_dependencies(options),
+            resource_hints={'DEBUG_DEFAULT_ENV': b'True',
+                            'SECOND_KEY': b'False'}
+        ))
+
 
 
 class _DataflowSideInput(beam.pvalue.AsSideInput):

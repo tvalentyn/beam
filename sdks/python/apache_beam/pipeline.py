@@ -524,8 +524,8 @@ class Pipeline(object):
 
       # When possible, invoke a round trip through the runner API.
       if test_runner_api and self._verify_runner_api_compatible():
-        default_environment = self.runner.get_default_environment()
-        runner_api_representation = self.to_runner_api(use_fake_coders=True, default_environment=self.runner.get_default_environment())
+        default_environment = self.runner.get_default_environment(self._options)
+        runner_api_representation = self.to_runner_api(use_fake_coders=True, default_environment=default_environment)
         x = Pipeline.from_runner_api(
             runner_api_representation,
             self.runner,

@@ -242,7 +242,7 @@ class PipelineRunner(object):
     """Whether to enable the beam_fn_api experiment by default."""
     return True
 
-  def get_default_environment(self):
+  def get_default_environment(self, options=None):
     """Provides default environment for portable pipeline execution."""
     # Must be implemented by portable runners.
     assert not self.is_fnapi_compatible()
