@@ -257,6 +257,7 @@ class DockerEnvironment(Environment):
         (self.container_image))
 
   def __eq__(self, other):
+
     return self.__class__ == other.__class__ \
            and self.container_image == other.container_image
 
@@ -542,6 +543,7 @@ class EmbeddedPythonEnvironment(Environment):
     super(EmbeddedPythonEnvironment, self).__init__(capabilities, artifacts, resource_hints)
 
   def __eq__(self, other):
+    # TODO: update resource hints in __eq__
     return self.__class__ == other.__class__
 
   def __ne__(self, other):

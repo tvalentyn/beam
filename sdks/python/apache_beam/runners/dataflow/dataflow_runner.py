@@ -488,17 +488,17 @@ class DataflowRunner(PipelineRunner):
     if use_fnapi and not apiclient._use_unified_worker(options):
       pipeline.replace_all(DataflowRunner._JRH_PTRANSFORM_OVERRIDES)
 
-    self._default_environment = self.get_default_environment(options)
-
-    # TODO: Add command-specified hints to default env? Parse command_line options in from_xxx methods on each environmnent?
-
     # This has to be performed before pipeline proto is constructed to make sure
     # that the changes are reflected in the portable job submission path.
     self._adjust_pipeline_for_dataflow_v2(pipeline)
 
     # Snapshot the pipeline in a portable proto.
+    # Note that pipeline.context can be already populated after the
+    # Pipeline > Runner API > Pipeline round trip.
     self.proto_pipeline, self.proto_context = pipeline.to_runner_api(
-        return_context=True, default_environment=self._default_environment)
+        return_context=True,
+        default_environment=None if pipeline.context is not None else \
+            self.get_default_environment(options))
 
     # Optimize the pipeline if it not streaming and the pre_optimize
     # experiment is set.
@@ -785,7 +785,7 @@ class DataflowRunner(PipelineRunner):
     step.add_property(
         PropertyNames.WINDOWING_STRATEGY,
         self.serialize_windowing_strategy(
-            windowing_strategy, self._default_environment))
+            windowing_strategy, self.get_default_environment()))
     return step
 
   def run_Impulse(self, transform_node, options):
@@ -1512,26 +1512,33 @@ class DataflowRunner(PipelineRunner):
 
   def get_default_environment(self, options):
     from apache_beam.transforms import environments
+
+    if self._default_environment:
+      return self._default_environment
+
     if options.view_as(SetupOptions).prebuild_sdk_container_engine:
       # if prebuild_sdk_container_engine is specified we will build a new sdk
       # container image with dependencies pre-installed and use that image,
       # instead of using the inferred default container image.
-      return (
+      self._default_environment = (
         environments.DockerEnvironment.from_options(options))
       options.view_as(WorkerOptions).worker_harness_container_image = (
         self._default_environment.container_image)
+        # TODO: Add command-specified hints to default env? Parse command_line options in from_xxx methods on each environmnent?
     else:
       # Local import same as above to "avoid adding the dependency for local
       # running scenarios". Unclear if requirement still relevant.
       # pylint: disable=wrong-import-order, wrong-import-position
       from apache_beam.runners.dataflow.internal import apiclient
-      return (
+      self._default_environment = (
         environments.DockerEnvironment.from_container_image(
             apiclient.get_container_image_from_options(options),
             artifacts=environments.python_sdk_dependencies(options),
+            # TODO: Add command-specified hints to default env? Parse command_line options in from_xxx methods on each environmnent?
             resource_hints={'DEBUG_DEFAULT_ENV': b'True',
                             'SECOND_KEY': b'False'}
         ))
+    return self._default_environment
 
 
 

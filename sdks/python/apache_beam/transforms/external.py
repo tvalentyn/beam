@@ -478,6 +478,7 @@ class ExternalTransform(ptransform.PTransform):
             for tag,
             pcoll in self._expanded_transform.outputs.items()
         },
+        # TODO - verify expanded environment ID has resource hints and/or create a new environment.
         environment_id=self._expanded_transform.environment_id)
 
 

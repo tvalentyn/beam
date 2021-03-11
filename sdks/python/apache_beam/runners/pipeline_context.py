@@ -26,6 +26,7 @@ For internal use only; no backwards-compatibility guarantees.
 from __future__ import absolute_import
 
 from builtins import object
+from copy import deepcopy
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Dict
@@ -222,18 +223,42 @@ class PipelineContext(object):
     self._requirements = set(requirements)
     self._resource_hints_to_env_map = {}
 
-  def get_environment_that_satisfies_hints(self, resource_hints):
-    return #...
-    default_env = self.default_environment_id()
-    assert default_env is not None
-    if not self._resource_hints_to_env_map:
-      import copy
-      self._resource_hints_to_env_map = copy.deepcopy(default_env)
-      self._resource_hints_to_env_map.resource_hints["DEBUG_ADDED_DURING_TRANSLATION"] = b"True"
-    return self._resource_hints_to_env_map
+  def get_environment_that_satisfies_hints(self, resource_hints, template_env_id=None):
+    # type: (Dict[str, bytes], str) -> str
 
+    def resource_hints_fingerprint(hints):
+      return tuple(sorted(hints.items()))
 
+    def create_new_env_from_default(default_env_id):
+      # type: (str) -> str
+      default_env = self.environments.get_proto_from_id(default_env_id)
+      # cloned_env = beam_runner_api_pb2.Environment()
+      # cloned_env.CopyFrom(default_env)
+      # for hint, value in resource_hints:
+      #   cloned_env.resource_hints[hint].CopyFrom(value)
+      # return self.environments.get_by_proto(cloned_env, 'environment')
 
+      cloned_env = type(default_env)()
+      cloned_env.CopyFrom(default_env)
+      for hint, value in resource_hints.items():
+        # TODO: reconciliation logic?
+        cloned_env.resource_hints[hint] = value
+      # TODO: Why new environment name has _str (red_Environment_str_2)
+      return self.environments.get_by_proto(cloned_env, 'environment')
+
+    default_env_id = template_env_id or self.default_environment_id()
+
+    if not resource_hints:
+      return default_env_id
+    assert default_env_id is not None, "Cannot translate resource hints without a default environment."
+
+    lookup_key = (default_env_id, resource_hints_fingerprint(resource_hints))
+    if lookup_key in self._resource_hints_to_env_map:
+      return self._resource_hints_to_env_map[lookup_key]
+    else:
+      new_env_id = create_new_env_from_default(default_env_id)
+      self._resource_hints_to_env_map[lookup_key] = new_env_id
+      return new_env_id
 
   def add_requirement(self, requirement):
     # type: (str) -> None

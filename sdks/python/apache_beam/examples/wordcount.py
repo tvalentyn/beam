@@ -75,7 +75,7 @@ def run(argv=None, save_main_session=True):
 
     # Read the text file[pattern] into a PCollection.
 
-    pairs = p | beam.Create([1, 2, 3]) | beam.Map(lambda x: (x, 1)).with_resource_hints(pipeline_hint="True")
+    pairs = p | beam.Create([1, 2, 3]) | beam.Map(lambda x: (x, 1)).with_resource_hints(pipeline_hint=b"True")
 
     # lines = p | 'Read' >> ReadFromText(known_args.input)
     #

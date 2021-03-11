@@ -352,7 +352,7 @@ class PTransform(WithTypeHints, HasDisplayData):
   def with_resource_hints(self, **kwargs):
     # TODO: validation for typos?
     # TODO: reconciliation with pipeline options logic?
-    self._resource_hints = dict(kwargs, debug='True')
+    self._resource_hints = dict(kwargs, debug=b'True')
     return self
 
   def get_resource_hints(self):
