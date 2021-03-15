@@ -107,6 +107,17 @@ class Environment(object):
     self._artifacts = artifacts
     self._resource_hints = resource_hints
 
+  def __eq__(self, other):
+    return (
+        self.__class__ == other.__class__
+        # Assuming that resource hints are the only attribute that may differ
+        # between instances of the same environment class.
+        and self._resource_hints == other._resource_hints)
+
+  def __hash__(self):
+    # type: () -> int
+    return hash((self.__class, frozenset(self._resource_hints.items())))
+
   def artifacts(self):
     # type: () -> Iterable[beam_runner_api_pb2.ArtifactInformation]
     return self._artifacts
@@ -200,8 +211,7 @@ class Environment(object):
          typed_param is None) else typed_param.encode('utf-8'),
         capabilities=self.capabilities(),
         dependencies=self.artifacts(),
-        resource_hints=self.resource_hints()
-    )
+        resource_hints=self.resource_hints())
 
   @classmethod
   def from_runner_api(cls,
@@ -242,7 +252,8 @@ class DockerEnvironment(Environment):
       artifacts=(),  # type: Iterable[beam_runner_api_pb2.ArtifactInformation]
       resource_hints={},  # type: Dict[str, bytes]
   ):
-    super(DockerEnvironment, self).__init__(capabilities, artifacts, resource_hints)
+    super(DockerEnvironment,
+          self).__init__(capabilities, artifacts, resource_hints)
     if container_image:
       logging.info(
           'Using provided Python SDK container image: %s' % (container_image))
@@ -257,9 +268,8 @@ class DockerEnvironment(Environment):
         (self.container_image))
 
   def __eq__(self, other):
-
-    return self.__class__ == other.__class__ \
-           and self.container_image == other.container_image
+    return (
+        super().__eq__(other) and self.container_image == other.container_image)
 
   def __ne__(self, other):
     # TODO(BEAM-5949): Needed for Python 2 compatibility.
@@ -289,8 +299,7 @@ class DockerEnvironment(Environment):
         container_image=payload.container_image,
         capabilities=capabilities,
         artifacts=artifacts,
-        resource_hints=resource_hints
-    )
+        resource_hints=resource_hints)
 
   @classmethod
   def from_options(cls, options):
@@ -307,16 +316,15 @@ class DockerEnvironment(Environment):
         # TODO resource_hints
         artifacts=python_sdk_dependencies(options))
 
-
   @classmethod
-  def from_container_image(cls, container_image, artifacts=(), resource_hints={}):
+  def from_container_image(
+      cls, container_image, artifacts=(), resource_hints={}):
     # type: (str, Iterable[beam_runner_api_pb2.ArtifactInformation]) -> DockerEnvironment
     return cls(
         container_image=container_image,
         capabilities=python_sdk_capabilities(),
         artifacts=artifacts,
-        resource_hints=resource_hints
-    )
+        resource_hints=resource_hints)
 
   @staticmethod
   def default_docker_image():
@@ -351,16 +359,18 @@ class ProcessEnvironment(Environment):
       resource_hints={},  # type: Dict[str, bytes]
   ):
     # type: (...) -> None
-    super(ProcessEnvironment, self).__init__(capabilities, artifacts, resource_hints)
+    super(ProcessEnvironment,
+          self).__init__(capabilities, artifacts, resource_hints)
     self.command = command
     self.os = os
     self.arch = arch
     self.env = env or {}
 
   def __eq__(self, other):
-    return self.__class__ == other.__class__ \
-      and self.command == other.command and self.os == other.os \
-      and self.arch == other.arch and self.env == other.env
+    return (
+        super().__eq__(other) and self.command == other.command and
+        self.os == other.os and self.arch == other.arch and
+        self.env == other.env)
 
   def __ne__(self, other):
     # TODO(BEAM-5949): Needed for Python 2 compatibility.
@@ -459,13 +469,15 @@ class ExternalEnvironment(Environment):
       artifacts=(),  # type: Iterable[beam_runner_api_pb2.ArtifactInformation]
       resource_hints={},  # type: Dict[str, bytes]
   ):
-    super(ExternalEnvironment, self).__init__(capabilities, artifacts, resource_hints)
+    super(ExternalEnvironment,
+          self).__init__(capabilities, artifacts, resource_hints)
     self.url = url
     self.params = params
 
   def __eq__(self, other):
-    return self.__class__ == other.__class__ and self.url == other.url \
-      and self.params == other.params
+    return (
+        super().__eq__(other) and self.url == other.url and
+        self.params == other.params)
 
   def __ne__(self, other):
     # TODO(BEAM-5949): Needed for Python 2 compatibility.
@@ -503,8 +515,7 @@ class ExternalEnvironment(Environment):
         params=payload.params or None,
         capabilities=capabilities,
         artifacts=artifacts,
-        resource_hints=resource_hints
-    )
+        resource_hints=resource_hints)
 
   @classmethod
   def from_options(cls, options):
@@ -528,8 +539,7 @@ class ExternalEnvironment(Environment):
         capabilities=python_sdk_capabilities(),
         artifacts=python_sdk_dependencies(options),
         # TODO
-        resource_hints={}
-    )
+        resource_hints={})
 
 
 @Environment.register_urn(python_urns.EMBEDDED_PYTHON, None)
@@ -540,19 +550,8 @@ class EmbeddedPythonEnvironment(Environment):
       artifacts=(),  # type: Iterable[beam_runner_api_pb2.ArtifactInformation]
       resource_hints={},  # type: Dict[str, bytes]
   ):
-    super(EmbeddedPythonEnvironment, self).__init__(capabilities, artifacts, resource_hints)
-
-  def __eq__(self, other):
-    # TODO: update resource hints in __eq__
-    return self.__class__ == other.__class__
-
-  def __ne__(self, other):
-    # TODO(BEAM-5949): Needed for Python 2 compatibility.
-    return not self == other
-
-  def __hash__(self):
-    # type: () -> int
-    return hash(self.__class__)
+    super(EmbeddedPythonEnvironment,
+          self).__init__(capabilities, artifacts, resource_hints)
 
   def to_runner_api_parameter(self, context):
     # type: (PipelineContext) -> Tuple[str, None]
@@ -589,14 +588,16 @@ class EmbeddedPythonGrpcEnvironment(Environment):
       artifacts=(),
       resource_hints={},
   ):
-    super(EmbeddedPythonGrpcEnvironment, self).__init__(capabilities, artifacts, resource_hints)
+    super(EmbeddedPythonGrpcEnvironment,
+          self).__init__(capabilities, artifacts, resource_hints)
     self.state_cache_size = state_cache_size
     self.data_buffer_time_limit_ms = data_buffer_time_limit_ms
 
   def __eq__(self, other):
-    return self.__class__ == other.__class__ \
-           and self.state_cache_size == other.state_cache_size \
-           and self.data_buffer_time_limit_ms == other.data_buffer_time_limit_ms
+    return (
+        super().__eq__(other) and
+        self.state_cache_size == other.state_cache_size and
+        self.data_buffer_time_limit_ms == other.data_buffer_time_limit_ms)
 
   def __ne__(self, other):
     # TODO(BEAM-5949): Needed for Python 2 compatibility.
@@ -643,8 +644,7 @@ class EmbeddedPythonGrpcEnvironment(Environment):
           data_buffer_time_limit_ms=config.get('data_buffer_time_limit_ms'),
           capabilities=capabilities,
           artifacts=artifacts,
-          resource_hints=resource_hints
-      )
+          resource_hints=resource_hints)
     else:
       return EmbeddedPythonGrpcEnvironment()
 
@@ -662,8 +662,7 @@ class EmbeddedPythonGrpcEnvironment(Environment):
           capabilities=python_sdk_capabilities(),
           artifacts=python_sdk_dependencies(options),
           # TODO
-          resource_hints={}
-      )
+          resource_hints={})
 
   @staticmethod
   def parse_config(s):
@@ -690,12 +689,13 @@ class SubprocessSDKEnvironment(Environment):
       artifacts=(),  # type: Iterable[beam_runner_api_pb2.ArtifactInformation]
       resource_hints={},  # type: Dict[str, bytes]
   ):
-    super(SubprocessSDKEnvironment, self).__init__(capabilities, artifacts, resource_hints)
+    super(SubprocessSDKEnvironment,
+          self).__init__(capabilities, artifacts, resource_hints)
     self.command_string = command_string
 
   def __eq__(self, other):
-    return self.__class__ == other.__class__ \
-           and self.command_string == other.command_string
+    return (
+        super().__eq__(other) and self.command_string == other.command_string)
 
   def __ne__(self, other):
     # TODO(BEAM-5949): Needed for Python 2 compatibility.
@@ -732,8 +732,7 @@ class SubprocessSDKEnvironment(Environment):
         capabilities=python_sdk_capabilities(),
         artifacts=python_sdk_dependencies(options),
         # TODO
-        resource_hints={}
-    )
+        resource_hints={})
 
 
 class RunnerAPIEnvironmentHolder(Environment):
@@ -750,7 +749,7 @@ class RunnerAPIEnvironmentHolder(Environment):
     return self.proto.capabilities
 
   def __eq__(self, other):
-    return self.__class__ == other.__class__ and self.proto == other.proto
+    return super().__eq__(other) and self.proto == other.proto
 
   def __ne__(self, other):
     # TODO(BEAM-5949): Needed for Python 2 compatibility.

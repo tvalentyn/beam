@@ -26,7 +26,6 @@ For internal use only; no backwards-compatibility guarantees.
 from __future__ import absolute_import
 
 from builtins import object
-from copy import deepcopy
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Dict
@@ -50,6 +49,7 @@ from apache_beam.portability.api import beam_fn_api_pb2
 from apache_beam.portability.api import beam_runner_api_pb2
 from apache_beam.transforms import core
 from apache_beam.transforms import environments
+from apache_beam.transforms import ptransform  # pylint: disable=unused-import
 from apache_beam.typehints import native_type_compatibility
 
 if TYPE_CHECKING:
@@ -125,7 +125,10 @@ class _PipelineContextMap(Generic[PortableObjectT]):
           return id
     return self.put_proto(
         self._pipeline_context.component_id_map.get_or_assign(
-            label, obj_type=self._obj_type),
+            obj=self._obj_type.from_runner_api(
+                maybe_new_proto, self._pipeline_context),
+            obj_type=self._obj_type,
+            label=label),
         maybe_new_proto)
 
   def get_id_to_proto_map(self):
@@ -223,40 +226,33 @@ class PipelineContext(object):
     self._requirements = set(requirements)
     self._resource_hints_to_env_map = {}
 
-  def get_environment_that_satisfies_hints(self, resource_hints, template_env_id=None):
-    # type: (Dict[str, bytes], str) -> str
+  def get_environment_id_for_transform(
+      self, transform):  # type: (Optional[ptransform.PTransform]) -> str
+    """Returns an environment id where the transform can be executed."""
+    if not transform or not transform.get_resource_hints():
+      return self.default_environment_id()
 
-    def resource_hints_fingerprint(hints):
-      return tuple(sorted(hints.items()))
+    resource_hints = transform.get_resource_hints()
 
-    def create_new_env_from_default(default_env_id):
-      # type: (str) -> str
-      default_env = self.environments.get_proto_from_id(default_env_id)
-      # cloned_env = beam_runner_api_pb2.Environment()
-      # cloned_env.CopyFrom(default_env)
-      # for hint, value in resource_hints:
-      #   cloned_env.resource_hints[hint].CopyFrom(value)
-      # return self.environments.get_by_proto(cloned_env, 'environment')
-
-      cloned_env = type(default_env)()
-      cloned_env.CopyFrom(default_env)
+    def create_environment_with_resource_hints(
+        template_env_id):  # type: (str) -> str
+      """Creates an environment that has necessary hints and returns its id."""
+      template_env = self.environments.get_proto_from_id(template_env_id)
+      cloned_env = type(template_env)()
+      cloned_env.CopyFrom(template_env)
       for hint, value in resource_hints.items():
-        # TODO: reconciliation logic?
         cloned_env.resource_hints[hint] = value
-      # TODO: Why new environment name has _str (red_Environment_str_2)
-      return self.environments.get_by_proto(cloned_env, 'environment')
 
-    default_env_id = template_env_id or self.default_environment_id()
+      return self.environments.get_by_proto(
+          cloned_env, label='environment_with_resource_hints')
 
-    if not resource_hints:
-      return default_env_id
-    assert default_env_id is not None, "Cannot translate resource hints without a default environment."
+    default_env_id = self.default_environment_id()
 
-    lookup_key = (default_env_id, resource_hints_fingerprint(resource_hints))
+    lookup_key = (default_env_id, tuple(sorted(resource_hints.items())))
     if lookup_key in self._resource_hints_to_env_map:
       return self._resource_hints_to_env_map[lookup_key]
     else:
-      new_env_id = create_new_env_from_default(default_env_id)
+      new_env_id = create_environment_with_resource_hints(default_env_id)
       self._resource_hints_to_env_map[lookup_key] = new_env_id
       return new_env_id
 

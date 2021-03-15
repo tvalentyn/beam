@@ -85,7 +85,6 @@ from apache_beam.options.pipeline_options_validator import PipelineOptionsValida
 from apache_beam.portability import common_urns
 from apache_beam.runners import PipelineRunner
 from apache_beam.runners import create_runner
-from apache_beam.transforms import environments
 from apache_beam.transforms import ParDo
 from apache_beam.transforms import ptransform
 from apache_beam.transforms.sideinputs import get_sideinput_index
@@ -528,11 +527,10 @@ class Pipeline(object):
       # When possible, invoke a round trip through the runner API.
       if test_runner_api and self._verify_runner_api_compatible():
         default_environment = self.runner.get_default_environment(self._options)
-        runner_api_representation = self.to_runner_api(use_fake_coders=True, default_environment=default_environment)
+        runner_api_representation = self.to_runner_api(
+            use_fake_coders=True, default_environment=default_environment)
         x = Pipeline.from_runner_api(
-            runner_api_representation,
-            self.runner,
-            self._options)
+            runner_api_representation, self.runner, self._options)
         x = x.run(False)
         return x
 
@@ -835,8 +833,7 @@ class Pipeline(object):
     from apache_beam.portability.api import beam_runner_api_pb2
     if self.context is not None:
       if context is not None or default_environment is not None:
-        raise ValueError(
-            'Pipeline already has a defined context.')
+        raise ValueError('Pipeline already has a defined context.')
       context = self.context
     elif context is None:
       context = pipeline_context.PipelineContext(
@@ -1184,23 +1181,17 @@ class AppliedPTransform(object):
     # Iterate over inputs and outputs by sorted key order, so that ids are
     # consistently generated for multiple runs of the same pipeline.
     transform_spec = transform_to_runner_api(self.transform, context)
-    # TODO: When is self.environment_id already populated? Should we check that it has sufficient hints?
-    # TODO: Should we check that the environment is known to the context?
-    # TODO: We should find out how environments are collected to the context.
-    # TODO: Possible solution: if environment is not in context, set it to None?
     environment_id = self.environment_id
     transform_urn = transform_spec.urn if transform_spec else None
-    # if ((not environment_id or environment_id not in context.environments) and
     if (not environment_id and
         (transform_urn not in Pipeline.runner_implemented_transforms())):
-      environment_id = context.default_environment_id()
-      if self.transform and self.transform.get_resource_hints():
-        environment_id = context.get_environment_that_satisfies_hints(self.transform.get_resource_hints(), environment_id)
+      environment_id = context.get_environment_id_for_transform(self.transform)
 
     #TODO: revert
-    subtransforms=[]
+    subtransforms = []
     for part in self.parts:
-      subtransforms.append(context.transforms.get_id(part, label=part.full_label))
+      subtransforms.append(
+          context.transforms.get_id(part, label=part.full_label))
 
     x = beam_runner_api_pb2.PTransform(
         unique_name=self.full_label,
@@ -1216,7 +1207,7 @@ class AppliedPTransform(object):
             for tag,
             out in sorted(self.named_outputs().items())
         },
-        # TODO: intentionally do not merge environments on composite transform, delegate this to the runner.
+        # Do not merge environments on composite transforms, delegate to runner.
         environment_id=environment_id,
         # TODO(BEAM-366): Add display_data.
         display_data=None)
@@ -1248,7 +1239,8 @@ class AppliedPTransform(object):
     transform = ptransform.PTransform.from_runner_api(proto, context)
     # TODO why is transform sometimes None?
     if transform and proto.environment_id:
-      resource_hints = context.environments.get_by_id(proto.environment_id).resource_hints()
+      resource_hints = context.environments.get_by_id(
+          proto.environment_id).resource_hints()
       if resource_hints:
         transform = transform.with_resource_hints(**resource_hints)
 
