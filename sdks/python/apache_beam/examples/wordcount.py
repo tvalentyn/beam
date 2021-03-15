@@ -78,8 +78,8 @@ def run(argv=None, save_main_session=True):
     pairs = (
         p | beam.Create([1, 2, 3])
         | beam.Map(lambda x: (x, 1)).with_resource_hints(pipeline_hint=b"True")
-        |
-        beam.Map(lambda x: (x, 1)).with_resource_hints(pipeline_hint=b"False"))
+        | beam.Map(lambda x: (x, 1)).with_resource_hints(
+            pipeline_hint_other=b"False"))
 
     # lines = p | 'Read' >> ReadFromText(known_args.input)
     #

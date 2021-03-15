@@ -799,6 +799,8 @@ def resource_hints_from_options(options):
   # return {}
   # TODO: remove debugging, actually parse options.
   resource_hints = {
-      'DEBUG_DEFAULT_ENV_FROM_OPTIONS': b'True', 'SECOND_KEY': b'False'
+      'DEBUG_DEFAULT_ENV_FROM_OPTIONS': b'True',
+      'SECOND_KEY': b'False',
+      'pipeline_hint': b'override'
   }
   return resource_hints

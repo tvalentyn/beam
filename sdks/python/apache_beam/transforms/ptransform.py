@@ -356,7 +356,7 @@ class PTransform(WithTypeHints, HasDisplayData):
     return self
 
   def get_resource_hints(self):
-    ## return dict(self._resource_hints)
+    ## TODO: return dict(self._resource_hints) ?
     return self._resource_hints
 
   def __init__(self, label=None):

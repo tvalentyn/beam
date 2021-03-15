@@ -232,32 +232,39 @@ class PipelineContext(object):
     if not transform or not transform.get_resource_hints():
       return self.default_environment_id()
 
-    resource_hints = transform.get_resource_hints()
+    def get_combined_resource_hints(environment_id, transform):
+      # TODO: add test.
+      # Hints already defined in the environment take precedence over hints
+      # specified by a transform.
+      combined_hints = dict(transform.get_resource_hints())
+      for hint, value in self.environments.get_by_id(environment_id).resource_hints().items():
+        combined_hints[hint] = value
+      return combined_hints
 
     def create_environment_with_resource_hints(
-        template_env_id):  # type: (str) -> str
+        template_env_id,
+        resource_hints,
+    ):  # type: (str, Dict[str, bytes]) -> str
       """Creates an environment that has necessary hints and returns its id."""
       template_env = self.environments.get_proto_from_id(template_env_id)
       cloned_env = type(template_env)()
       cloned_env.CopyFrom(template_env)
+      cloned_env.resource_hints.clear()
       for hint, value in resource_hints.items():
-        # TODO: add test.
-        # Hints already defined in the environment take precedence over hints
-        # specified by a transform.
-        if hint not in cloned_env.resource_hints:
-          cloned_env.resource_hints[hint] = value
+        cloned_env.resource_hints[hint] = value
 
       return self.environments.get_by_proto(
           cloned_env, label='environment_with_resource_hints')
 
     default_env_id = self.default_environment_id()
-
-    lookup_key = (default_env_id, tuple(sorted(resource_hints.items())))
-    if lookup_key in self._resource_hints_to_env_map:
-      return self._resource_hints_to_env_map[lookup_key]
+    combined_hints = get_combined_resource_hints(default_env_id, transform)
+    resource_hints_key = (default_env_id, tuple(sorted(combined_hints.items())))
+    if resource_hints_key in self._resource_hints_to_env_map:
+      return self._resource_hints_to_env_map[resource_hints_key]
     else:
-      new_env_id = create_environment_with_resource_hints(default_env_id)
-      self._resource_hints_to_env_map[lookup_key] = new_env_id
+      new_env_id = create_environment_with_resource_hints(
+          default_env_id, combined_hints)
+      self._resource_hints_to_env_map[resource_hints_key] = new_env_id
       return new_env_id
 
   def add_requirement(self, requirement):
