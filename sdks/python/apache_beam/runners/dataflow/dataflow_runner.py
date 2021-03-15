@@ -1510,7 +1510,7 @@ class DataflowRunner(PipelineRunner):
       pass
     return None
 
-  def get_default_environment(self, options):
+  def get_default_environment(self, options=None):
     from apache_beam.transforms import environments
 
     if self._default_environment:
@@ -1521,25 +1521,21 @@ class DataflowRunner(PipelineRunner):
       # container image with dependencies pre-installed and use that image,
       # instead of using the inferred default container image.
       self._default_environment = (
-        environments.DockerEnvironment.from_options(options))
+          environments.DockerEnvironment.from_options(options))
       options.view_as(WorkerOptions).worker_harness_container_image = (
-        self._default_environment.container_image)
-        # TODO: Add command-specified hints to default env? Parse command_line options in from_xxx methods on each environmnent?
+          self._default_environment.container_image)
     else:
       # Local import same as above to "avoid adding the dependency for local
       # running scenarios". Unclear if requirement still relevant.
       # pylint: disable=wrong-import-order, wrong-import-position
       from apache_beam.runners.dataflow.internal import apiclient
       self._default_environment = (
-        environments.DockerEnvironment.from_container_image(
-            apiclient.get_container_image_from_options(options),
-            artifacts=environments.python_sdk_dependencies(options),
-            # TODO: Add command-specified hints to default env? Parse command_line options in from_xxx methods on each environmnent?
-            resource_hints={'DEBUG_DEFAULT_ENV': b'True',
-                            'SECOND_KEY': b'False'}
-        ))
+          environments.DockerEnvironment.from_container_image(
+              apiclient.get_container_image_from_options(options),
+              artifacts=environments.python_sdk_dependencies(options),
+              resource_hints=environments.resource_hints_from_options(options),
+          ))
     return self._default_environment
-
 
 
 class _DataflowSideInput(beam.pvalue.AsSideInput):

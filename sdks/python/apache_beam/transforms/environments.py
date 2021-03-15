@@ -55,6 +55,7 @@ from apache_beam.runners.portability.sdk_container_builder import SdkContainerIm
 from apache_beam.utils import proto_utils
 
 if TYPE_CHECKING:
+  from apache_beam.options.pipeline_options import PipelineOptions
   from apache_beam.options.pipeline_options import PortableOptions
   from apache_beam.runners.pipeline_context import PipelineContext
 
@@ -310,21 +311,25 @@ class DockerEnvironment(Environment):
           options)
       return cls.from_container_image(
           container_image=prebuilt_container_image,
-          artifacts=python_sdk_dependencies(options))
+          artifacts=python_sdk_dependencies(options),
+          resource_hints=resource_hints_from_options(options),
+      )
     return cls.from_container_image(
         container_image=options.lookup_environment_option(
             'docker_container_image') or options.environment_config,
         # TODO resource_hints
-        artifacts=python_sdk_dependencies(options))
+        artifacts=python_sdk_dependencies(options),
+        resource_hints=resource_hints_from_options(options),
+    )
 
   @classmethod
   def from_container_image(
       # TODO - we need to pass correct hints here.
       cls,
       container_image,
-      artifacts=(),
-      resource_hints=None):
-    # type: (str, Iterable[beam_runner_api_pb2.ArtifactInformation]) -> DockerEnvironment
+      artifacts,
+      resource_hints):
+    # type: (str, Iterable[beam_runner_api_pb2.ArtifactInformation], Dict[str, bytes]) -> DockerEnvironment
     return cls(
         container_image=container_image,
         capabilities=python_sdk_capabilities(),
@@ -450,8 +455,7 @@ class ProcessEnvironment(Environment):
           env=config.get('env', ''),
           capabilities=python_sdk_capabilities(),
           artifacts=python_sdk_dependencies(options),
-          # TODO
-          resource_hints=None,
+          resource_hints=resource_hints_from_options(options),
       )
     env = cls.parse_environment_variables(
         options.lookup_environment_option('process_variables').split(',')
@@ -460,7 +464,9 @@ class ProcessEnvironment(Environment):
         options.lookup_environment_option('process_command'),
         env=env,
         capabilities=python_sdk_capabilities(),
-        artifacts=python_sdk_dependencies(options))
+        artifacts=python_sdk_dependencies(options),
+        resource_hints=resource_hints_from_options(options),
+    )
 
 
 @Environment.register_urn(
@@ -543,8 +549,7 @@ class ExternalEnvironment(Environment):
         params=params,
         capabilities=python_sdk_capabilities(),
         artifacts=python_sdk_dependencies(options),
-        # TODO
-        resource_hints=None)
+        resource_hints=resource_hints_from_options())
 
 
 @Environment.register_urn(python_urns.EMBEDDED_PYTHON, None)
@@ -578,8 +583,7 @@ class EmbeddedPythonEnvironment(Environment):
     return cls(
         capabilities=python_sdk_capabilities(),
         artifacts=python_sdk_dependencies(options),
-        # TODO
-        resource_hints=None,
+        resource_hints=resource_hints_from_options(),
     )
 
 
@@ -666,8 +670,7 @@ class EmbeddedPythonGrpcEnvironment(Environment):
       return cls(
           capabilities=python_sdk_capabilities(),
           artifacts=python_sdk_dependencies(options),
-          # TODO
-          resource_hints=None)
+          resource_hints=resource_hints_from_options())
 
   @staticmethod
   def parse_config(s):
@@ -736,8 +739,7 @@ class SubprocessSDKEnvironment(Environment):
         options.environment_config,
         capabilities=python_sdk_capabilities(),
         artifacts=python_sdk_dependencies(options),
-        # TODO
-        resource_hints=None)
+        resource_hints=resource_hints_from_options())
 
 
 class RunnerAPIEnvironmentHolder(Environment):
@@ -790,3 +792,13 @@ def python_sdk_dependencies(options, tmp_dir=None):
       SetupOptions).prebuild_sdk_container_engine is not None
   return stager.Stager.create_job_resources(
       options, tmp_dir, skip_prestaged_dependencies=skip_prestaged_dependencies)
+
+
+def resource_hints_from_options(options):
+  # type: (PipelineOptions) -> Dict[str, bytes]
+  # return {}
+  # TODO: remove debugging.
+  resource_hints = {
+      'DEBUG_DEFAULT_ENV_FROM_OPTIONS': b'True', 'SECOND_KEY': b'False'
+  }
+  return resource_hints
