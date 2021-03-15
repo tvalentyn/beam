@@ -351,8 +351,9 @@ class PTransform(WithTypeHints, HasDisplayData):
 
   def with_resource_hints(self, **kwargs):
     # TODO: validation for typos?
-    # TODO: reconciliation with pipeline options logic?
-    self._resource_hints = dict(kwargs, debug=b'True')
+    d = dict(kwargs)
+    # d['debug']=b'True'
+    self._resource_hints = parse_resource_hints(d)
     return self
 
   def get_resource_hints(self):
@@ -1072,3 +1073,11 @@ class _NamedPTransform(PTransform):
 
   def expand(self, pvalue):
     raise RuntimeError("Should never be expanded directly.")
+
+
+def parse_resource_hints(hints):
+  # TODO: find a better home for this logic.
+  # TODO: default environments should have hints specified by options.
+  parsed_hints = dict(hints)
+  parsed_hints['parsed'] = b'True'
+  return parsed_hints

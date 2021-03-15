@@ -52,6 +52,7 @@ from apache_beam.portability.api import beam_runner_api_pb2
 from apache_beam.portability.api import endpoints_pb2
 from apache_beam.runners.portability import stager
 from apache_beam.runners.portability.sdk_container_builder import SdkContainerImageBuilder
+from apache_beam.transforms.ptransform import parse_resource_hints
 from apache_beam.utils import proto_utils
 
 if TYPE_CHECKING:
@@ -549,7 +550,7 @@ class ExternalEnvironment(Environment):
         params=params,
         capabilities=python_sdk_capabilities(),
         artifacts=python_sdk_dependencies(options),
-        resource_hints=resource_hints_from_options())
+        resource_hints=resource_hints_from_options(options))
 
 
 @Environment.register_urn(python_urns.EMBEDDED_PYTHON, None)
@@ -583,7 +584,7 @@ class EmbeddedPythonEnvironment(Environment):
     return cls(
         capabilities=python_sdk_capabilities(),
         artifacts=python_sdk_dependencies(options),
-        resource_hints=resource_hints_from_options(),
+        resource_hints=resource_hints_from_options(options),
     )
 
 
@@ -670,7 +671,7 @@ class EmbeddedPythonGrpcEnvironment(Environment):
       return cls(
           capabilities=python_sdk_capabilities(),
           artifacts=python_sdk_dependencies(options),
-          resource_hints=resource_hints_from_options())
+          resource_hints=resource_hints_from_options(options))
 
   @staticmethod
   def parse_config(s):
@@ -739,7 +740,7 @@ class SubprocessSDKEnvironment(Environment):
         options.environment_config,
         capabilities=python_sdk_capabilities(),
         artifacts=python_sdk_dependencies(options),
-        resource_hints=resource_hints_from_options())
+        resource_hints=resource_hints_from_options(options))
 
 
 class RunnerAPIEnvironmentHolder(Environment):
@@ -803,4 +804,4 @@ def resource_hints_from_options(options):
       'SECOND_KEY': b'False',
       'pipeline_hint': b'override'
   }
-  return resource_hints
+  return parse_resource_hints(resource_hints)

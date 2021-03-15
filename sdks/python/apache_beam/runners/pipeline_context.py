@@ -119,16 +119,17 @@ class _PipelineContextMap(Generic[PortableObjectT]):
 
   def get_by_proto(self, maybe_new_proto, label=None, deduplicate=False):
     # type: (message.Message, Optional[str], bool) -> str
+    obj = self._obj_type.from_runner_api(
+        maybe_new_proto, self._pipeline_context)
     if deduplicate:
+      if obj in self._obj_to_id:
+        return self._obj_to_id[obj]
       for id, proto in self._id_to_proto.items():
         if proto == maybe_new_proto:
           return id
     return self.put_proto(
         self._pipeline_context.component_id_map.get_or_assign(
-            obj=self._obj_type.from_runner_api(
-                maybe_new_proto, self._pipeline_context),
-            obj_type=self._obj_type,
-            label=label),
+            obj=obj, obj_type=self._obj_type, label=label),
         maybe_new_proto)
 
   def get_id_to_proto_map(self):
@@ -224,7 +225,6 @@ class PipelineContext(object):
     self.iterable_state_read = iterable_state_read
     self.iterable_state_write = iterable_state_write
     self._requirements = set(requirements)
-    self._resource_hints_to_env_map = {}
 
   def get_environment_id_for_transform(
       self, transform):  # type: (Optional[ptransform.PTransform]) -> str
@@ -232,16 +232,15 @@ class PipelineContext(object):
     if not transform or not transform.get_resource_hints():
       return self.default_environment_id()
 
-    def get_combined_resource_hints(environment_id, transform):
+    def merge_resource_hints(environment_id, transform):
       # TODO: add test.
       # Hints already defined in the environment take precedence over hints
       # specified by a transform.
-      combined_hints = dict(transform.get_resource_hints())
-      for hint, value in self.environments.get_by_id(environment_id).resource_hints().items():
-        combined_hints[hint] = value
-      return combined_hints
+      return dict(
+          transform.get_resource_hints(),
+          **self.environments.get_by_id(environment_id).resource_hints())
 
-    def create_environment_with_resource_hints(
+    def get_or_create_environment_with_resource_hints(
         template_env_id,
         resource_hints,
     ):  # type: (str, Dict[str, bytes]) -> str
@@ -254,18 +253,13 @@ class PipelineContext(object):
         cloned_env.resource_hints[hint] = value
 
       return self.environments.get_by_proto(
-          cloned_env, label='environment_with_resource_hints')
+          cloned_env, label='environment_with_resource_hints', deduplicate=True)
 
     default_env_id = self.default_environment_id()
-    combined_hints = get_combined_resource_hints(default_env_id, transform)
-    resource_hints_key = (default_env_id, tuple(sorted(combined_hints.items())))
-    if resource_hints_key in self._resource_hints_to_env_map:
-      return self._resource_hints_to_env_map[resource_hints_key]
-    else:
-      new_env_id = create_environment_with_resource_hints(
-          default_env_id, combined_hints)
-      self._resource_hints_to_env_map[resource_hints_key] = new_env_id
-      return new_env_id
+    merged_hints = merge_resource_hints(default_env_id, transform)
+    maybe_new_env_id = get_or_create_environment_with_resource_hints(
+        default_env_id, merged_hints)
+    return maybe_new_env_id
 
   def add_requirement(self, requirement):
     # type: (str) -> None
