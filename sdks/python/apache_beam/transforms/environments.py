@@ -797,7 +797,7 @@ def python_sdk_dependencies(options, tmp_dir=None):
 def resource_hints_from_options(options):
   # type: (PipelineOptions) -> Dict[str, bytes]
   # return {}
-  # TODO: remove debugging.
+  # TODO: remove debugging, actually parse options.
   resource_hints = {
       'DEBUG_DEFAULT_ENV_FROM_OPTIONS': b'True', 'SECOND_KEY': b'False'
   }

@@ -240,9 +240,12 @@ class PipelineContext(object):
       template_env = self.environments.get_proto_from_id(template_env_id)
       cloned_env = type(template_env)()
       cloned_env.CopyFrom(template_env)
-      # TODO: preserve hints already set by an environment.
       for hint, value in resource_hints.items():
-        cloned_env.resource_hints[hint] = value
+        # TODO: add test.
+        # Hints already defined in the environment take precedence over hints
+        # specified by a transform.
+        if hint not in cloned_env.resource_hints:
+          cloned_env.resource_hints[hint] = value
 
       return self.environments.get_by_proto(
           cloned_env, label='environment_with_resource_hints')
