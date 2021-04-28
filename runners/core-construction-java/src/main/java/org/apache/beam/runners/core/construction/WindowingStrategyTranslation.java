@@ -288,8 +288,7 @@ public class WindowingStrategyTranslation implements Serializable {
     FunctionSpec windowFnSpec = toProto(windowFn, components);
     String environmentId =
         Strings.isNullOrEmpty(windowingStrategy.getEnvironmentId())
-            ? components.getEnvironmentIdFor(
-                ResourceHints.create())
+            ? components.getEnvironmentIdFor(ResourceHints.create())
             : windowingStrategy.getEnvironmentId();
 
     RunnerApi.WindowingStrategy.Builder windowingStrategyProto =
