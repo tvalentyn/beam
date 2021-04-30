@@ -538,6 +538,10 @@ class DataflowRunner(PipelineRunner):
         and/or enable_streaming_engine experiments are present.
         It is recommended you only set the --enable_streaming_engine flag.""")
 
+    if (debug_options.lookup_experiment("enable_streaming_engine") and
+        not options.view_as(StandardOptions).streaming):
+      raise ValueError("Streaming engine is only supported for streaming jobs.")
+
     dataflow_worker_jar = getattr(worker_options, 'dataflow_worker_jar', None)
     if dataflow_worker_jar is not None:
       if not apiclient._use_fnapi(options):
