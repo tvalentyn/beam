@@ -642,7 +642,7 @@ def examples_wordcount_debugging(renames):
     p.visit(SnippetUtils.RenameFiles(renames))
 
 
-def examples_wordcount_streaming(argv):
+def examples_wordcount_streaming():
   import apache_beam as beam
   from apache_beam import window
   from apache_beam.options.pipeline_options import PipelineOptions
@@ -667,7 +667,7 @@ def examples_wordcount_streaming(argv):
       help=(
           'Input PubSub subscription of the form '
           '"projects/<PROJECT>/subscriptions/<SUBSCRIPTION>."'))
-  known_args, pipeline_args = parser.parse_known_args(argv)
+  known_args, pipeline_args = parser.parse_known_args()
 
   pipeline_options = PipelineOptions(pipeline_args)
   pipeline_options.view_as(StandardOptions).streaming = True

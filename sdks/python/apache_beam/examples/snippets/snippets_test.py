@@ -33,6 +33,7 @@ import uuid
 
 import mock
 import parameterized
+from mock import patch
 
 import apache_beam as beam
 import apache_beam.transforms.combiners as combiners
@@ -854,23 +855,27 @@ class SnippetsTest(unittest.TestCase):
         FakeReadFromPubSub(topic=input_topic, values=input_values))
     beam.io.WriteToPubSub = (
         FakeWriteToPubSub(topic=output_topic, values=output_values))
-    snippets.examples_wordcount_streaming([
-        '--input_topic',
-        'projects/fake-beam-test-project/topic/intopic',
-        '--output_topic',
-        'projects/fake-beam-test-project/topic/outtopic'
-    ])
+    with patch.object(sys,
+                      'argv',
+                      ['unused_argv[0]',
+                       '--input_topic',
+                       'projects/fake-beam-test-project/topic/intopic',
+                       '--output_topic',
+                       'projects/fake-beam-test-project/topic/outtopic']):
+      snippets.examples_wordcount_streaming()
+      # Test with custom subscription.
+      input_sub = 'projects/fake-beam-test-project/subscriptions/insub'
+      beam.io.ReadFromPubSub = FakeReadFromPubSub(
+          subscription=input_sub, values=input_values)
 
-    # Test with custom subscription.
-    input_sub = 'projects/fake-beam-test-project/subscriptions/insub'
-    beam.io.ReadFromPubSub = FakeReadFromPubSub(
-        subscription=input_sub, values=input_values)
-    snippets.examples_wordcount_streaming([
-        '--input_subscription',
-        'projects/fake-beam-test-project/subscriptions/insub',
-        '--output_topic',
-        'projects/fake-beam-test-project/topic/outtopic'
-    ])
+    with patch.object(sys,
+                      'argv',
+                      ['unused_argv[0]',
+                       '--input_subscription',
+                       'projects/fake-beam-test-project/subscriptions/insub',
+                       '--output_topic',
+                       'projects/fake-beam-test-project/topic/outtopic']):
+      snippets.examples_wordcount_streaming()
 
   def test_model_composite_transform_example(self):
     contents = ['aa bb cc', 'bb cc', 'cc']
