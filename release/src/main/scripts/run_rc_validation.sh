@@ -53,8 +53,8 @@ function clean_up(){
     echo "* Restored ~/.bashrc"
   fi
 
-  rm -rf ${LOCAL_BEAM_DIR}
-  echo "* Deleted workspace ${LOCAL_BEAM_DIR}"
+  # rm -rf ${LOCAL_BEAM_DIR}
+  # echo "* Deleted workspace ${LOCAL_BEAM_DIR}"
 }
 trap clean_up EXIT
 
@@ -114,13 +114,14 @@ if [[ -z ${GITHUB_TOKEN} ]]; then
   echo "Note: This token can be reused in other release scripts."
   exit
 else
-  if [[ -d ${LOCAL_BEAM_DIR} ]]; then
-    rm -rf ${LOCAL_BEAM_DIR}
-  fi
+  # if [[ -d ${LOCAL_BEAM_DIR} ]]; then
+  #  rm -rf ${LOCAL_BEAM_DIR}
+  # fi
   echo "* Creating local Beam workspace: ${LOCAL_BEAM_DIR}"
   mkdir -p ${LOCAL_BEAM_DIR}
   echo "* Cloning Beam repo"
   git clone --branch ${RC_TAG} ${GIT_REPO_URL} ${LOCAL_BEAM_DIR}
+  exit 0
   cd ${LOCAL_BEAM_DIR}
   git checkout -b ${WORKING_BRANCH} ${RC_TAG} --quiet
   echo "* Setting up git config"
@@ -174,12 +175,8 @@ if [[ -z `which gcloud` ]]; then
 fi
 gcloud --version
 
-echo "-----------------Checking Bigquery CLI-----------------"
-if [[ ! -f ~/.bigqueryrc ]]; then
-  echo "-----------------Initialing Bigquery CLI-----------------"
-  bq init
-fi
-bq version
+gcloud auth login
+gcloud auth application-default login
 
 echo "-----------------Checking gnome-terminal-----------------"
 if [[ -z `which gnome-terminal` ]]; then
@@ -376,9 +373,6 @@ if [[ ("$python_leaderboard_direct" = true \
   echo "--------------------------Verifying Hashes------------------------------------"
   sha512sum -c apache-beam-${RELEASE_VER}.zip.sha512
 
-  `which pip` install --upgrade pip
-  `which pip` install --upgrade setuptools
-
   echo "--------------------------Updating ~/.m2/settings.xml-------------------------"
     cd ~
     if [[ ! -d .m2 ]]; then
@@ -443,8 +437,10 @@ if [[ ("$python_leaderboard_direct" = true \
   do
     rm -rf ./beam_env_${py_version}
     echo "--------------Setting up virtualenv with $py_version interpreter----------------"
-    $py_version -m venv beam_env_${py_version} 
-    . beam_env_${py_version}/bin/activate
+    $py_version -m venv beam_env_${py_version}
+    . ./beam_env_${py_version}/bin/activate
+    pip install --upgrade pip
+    pip install wheel
 
     echo "--------------------------Installing Python SDK-------------------------------"
     pip install apache-beam-${RELEASE_VER}.zip[gcp]
