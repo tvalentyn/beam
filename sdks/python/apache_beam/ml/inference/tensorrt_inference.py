@@ -121,7 +121,16 @@ class TensorRTEngine:
     self.outputs = []
     self.gpu_allocations = []
     self.cpu_allocations = []
-    """Setup I/O bindings."""
+
+    # TODO(https://github.com/NVIDIA/TensorRT/issues/2557):
+    # Clean up when fixed upstream and lower bound for tensorrt is updated.
+    def nptype(trt_type):
+      if trt_type == bool:
+        return np.bool_
+      else:
+        return trt.nptype(trt_type)
+
+    # Setup I/O bindings.
     for i in range(self.engine.num_bindings):
       name = self.engine.get_binding_name(i)
       dtype = self.engine.get_binding_dtype(i)
@@ -131,7 +140,7 @@ class TensorRTEngine:
       binding = {
           'index': i,
           'name': name,
-          'dtype': np.dtype(trt.nptype(dtype)),
+          'dtype': np.dtype(nptype(dtype)),
           'shape': list(shape),
           'allocation': allocation,
           'size': size
