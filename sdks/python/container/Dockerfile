@@ -42,6 +42,7 @@ RUN  \
        ccache \
        # Required for using Beam Python SDK on ARM machines.
        libgeos-dev \
+       google-perftools \
        && \
     rm -rf /var/lib/apt/lists/* && \
 
