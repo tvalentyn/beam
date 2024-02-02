@@ -282,7 +282,7 @@ func launchSDKProcess() error {
 					return
 				}
 				logger.Printf(ctx, "Executing Python (worker %v): python %v", workerId, strings.Join(args, " "))
-				cmd := StartCommandEnv(map[string]string{"WORKER_ID": workerId, "LD_PRELOAD":"/usr/lib/libtcmalloc.so.4", "HEAPPROFILE": "/tmp/profile"}, os.Stdin, bufLogger, bufLogger, "python", args...)
+				cmd := StartCommandEnv(map[string]string{"WORKER_ID": workerId, "LD_PRELOAD":"/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4", "HEAPPROFILE": "/tmp/profile"}, os.Stdin, bufLogger, bufLogger, "python", args...)
 				childPids.v = append(childPids.v, cmd.Process.Pid)
 				childPids.mu.Unlock()
 
